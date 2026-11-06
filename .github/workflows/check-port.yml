@@ -13,6 +13,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           submodules: true
+      - name: Install glslang
+        run: sudo apt-get install -y --no-install-recommends glslang-tools
       - name: Apply the core patch
         run: bash tools/apply-eglantine-patches.sh
       - name: Run prepare-vulkan-port.py --report
