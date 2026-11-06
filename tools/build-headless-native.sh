@@ -78,58 +78,63 @@ echo "Building Eden with $jobs parallel jobs"
 keep_going=()
 [[ ${CI:-} == true ]] && keep_going=(-- -k 0)
 cmake --build "$scratch/native-local" --target eden-headless core -j "$jobs" "${keep_going[@]}"
+# On CI, run every check below and report all failures together instead of stopping at the first.
+failed_checks=()
+check() { if [[ ${CI:-} == true ]]; then "$@" || failed_checks+=("$3"); else "$@"; fi; }
+report_checks() { if ((${#failed_checks[@]})); then printf 'Failed check: %s\n' "${failed_checks[@]}" >&2; exit 1; fi; }
 # In every build: an object that saw Eden's own table header would write a table the rest keeps sparse.
-python3 -B "$root/tools/check-sparse-header.py" "$scratch/native-local"
-python3 -B "$root/tools/check-macro-headers.py" "$scratch/native-local"
-python3 -B "$root/tools/check-multiplayer-headers.py" "$scratch/native-local"
+check python3 -B "$root/tools/check-sparse-header.py" "$scratch/native-local"
+check python3 -B "$root/tools/check-macro-headers.py" "$scratch/native-local"
+check python3 -B "$root/tools/check-multiplayer-headers.py" "$scratch/native-local"
 if [[ "${EDEN_PS5_VULKAN:-OFF}" == ON ]]; then
-    python3 -B "$root/tools/check-vulkan-handoff.py"
-    python3 -B "$root/tools/check-transient-images.py"
-    python3 -B "$root/tools/check-native-allocator-header.py"
-    python3 -B "$root/tools/check-gpu-time-probe.py"
-    python3 -B "$root/tools/check-fence-requirements.py"
+    check python3 -B "$root/tools/check-vulkan-handoff.py"
+    check python3 -B "$root/tools/check-transient-images.py"
+    check python3 -B "$root/tools/check-native-allocator-header.py"
+    check python3 -B "$root/tools/check-gpu-time-probe.py"
+    check python3 -B "$root/tools/check-fence-requirements.py"
 fi
 # Source checks of the release configuration (development builds opt out: EDEN_SKIP_SOURCE_CHECKS=1).
-[[ ${EDEN_SKIP_SOURCE_CHECKS:-0} == 1 ]] && exit 0
-python3 -B "$root/headless/check_audio_shutdown.py" "$scratch/native-local/headless/core.cpp" "$scratch/source/src/core/core.cpp"
-python3 -B "$root/tools/check-load-failure.py"
-python3 -B "$root/tools/check-launcher-autoboot.py"
-python3 -B "$root/tools/check-extracted-content.py"
-python3 -B "$root/tools/check-vfs-file-budget.py"
-python3 -B "$root/tools/check-nso-memory.py"
-python3 -B "$root/tools/check-performance.py"
-python3 -B "$root/tools/check-performance-settings.py"
-python3 -B "$root/tools/check-startup-performance.py"
-python3 -B "$root/tools/check-worker-affinity.py"
-python3 -B "$root/tools/check-tsc-fallback.py"
-python3 -B "$root/tools/check-jit-protection.py"
-python3 -B "$root/tools/check-jit-allocator.py"
-python3 -B "$root/tools/check-jit-patch-lookup.py"
-python3 -B "$root/tools/check-jit-assert.py"
-python3 -B "$root/tools/check-crash-report.py"
-python3 -B "$root/tools/check-system-keyboard.py"
-python3 -B "$root/tools/check-nx2-core.py"
-python3 -B "$root/tools/check-shader-attributes.py"
-python3 -B "$root/tools/check-bananza-terrain.py"
+[[ ${EDEN_SKIP_SOURCE_CHECKS:-0} == 1 ]] && { report_checks; exit 0; }
+check python3 -B "$root/headless/check_audio_shutdown.py" "$scratch/native-local/headless/core.cpp" "$scratch/source/src/core/core.cpp"
+check python3 -B "$root/tools/check-load-failure.py"
+check python3 -B "$root/tools/check-launcher-autoboot.py"
+check python3 -B "$root/tools/check-extracted-content.py"
+check python3 -B "$root/tools/check-vfs-file-budget.py"
+check python3 -B "$root/tools/check-nso-memory.py"
+check python3 -B "$root/tools/check-performance.py"
+check python3 -B "$root/tools/check-performance-settings.py"
+check python3 -B "$root/tools/check-startup-performance.py"
+check python3 -B "$root/tools/check-worker-affinity.py"
+check python3 -B "$root/tools/check-tsc-fallback.py"
+check python3 -B "$root/tools/check-jit-protection.py"
+check python3 -B "$root/tools/check-jit-allocator.py"
+check python3 -B "$root/tools/check-jit-patch-lookup.py"
+check python3 -B "$root/tools/check-jit-assert.py"
+check python3 -B "$root/tools/check-crash-report.py"
+check python3 -B "$root/tools/check-system-keyboard.py"
+check python3 -B "$root/tools/check-nx2-core.py"
+check python3 -B "$root/tools/check-shader-attributes.py"
+check python3 -B "$root/tools/check-bananza-terrain.py"
 
 if [[ "$probe" == OFF ]]; then
-    python3 -B "$root/tools/check-exclusive-monitor.py"
+    check python3 -B "$root/tools/check-exclusive-monitor.py"
 else
     # The graphics-only entry returns before Core construction; its JIT is dead-stripped.
-    python3 -B "$root/tools/check-gpu-probe.py" --self-test
-    python3 -B "$root/tools/check-native-queue-probe.py"
+    check python3 -B "$root/tools/check-gpu-probe.py" --self-test
+    check python3 -B "$root/tools/check-native-queue-probe.py"
 fi
 if [[ "$graphics" == ON ]]; then
-    python3 -B "$root/tools/check-native-gpu-thread.py"
-    python3 -B "$root/tools/check-gpu-producer-stop.py"
+    check python3 -B "$root/tools/check-native-gpu-thread.py"
+    check python3 -B "$root/tools/check-gpu-producer-stop.py"
     if [[ "${EDEN_PS5_VULKAN:-OFF}" == ON ]]; then
-        python3 -B "$root/tools/check-staging-pressure.py"
+        check python3 -B "$root/tools/check-staging-pressure.py"
     fi
-    python3 -B "$root/tools/check-gpu-sync-stop.py"
-    python3 -B "$root/tools/check-nvdrv-process-lifetime.py"
-    python3 -B "$root/tools/check-integer-buffer-clear.py"
-    python3 -B "$root/tools/check-game-capture-shutdown.py"
+    check python3 -B "$root/tools/check-gpu-sync-stop.py"
+    check python3 -B "$root/tools/check-nvdrv-process-lifetime.py"
+    check python3 -B "$root/tools/check-integer-buffer-clear.py"
+    check python3 -B "$root/tools/check-game-capture-shutdown.py"
 fi
 
-python3 -B tools/check-hud.py
-python3 -B tools/check-game-frame-summary.py
+check python3 -B tools/check-hud.py
+check python3 -B tools/check-game-frame-summary.py
+report_checks
