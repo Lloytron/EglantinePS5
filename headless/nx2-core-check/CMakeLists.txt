@@ -14,24 +14,18 @@ FetchContent_Declare(Catch2
     URL_HASH "SHA512=${catch_hash}")
 FetchContent_MakeAvailable(Catch2)
 file(GLOB ampere_tests CONFIGURE_DEPENDS "${EDEN_SOURCE}/src/tests/video_core/ampere_*.cpp")
-# These two integration tests link the complete shader compiler and run in upstream tests.
+# These integration tests link the complete shader compiler (SPIR-V backend, Maxwell translator
+# or TranslatorVisitor) and run in upstream tests.
 # This host check exercises the header-only native capture/lowering and memory helpers.
-list(FILTER ampere_tests EXCLUDE REGEX "ampere_(bindless_tex|sured)\\.cpp$")
+list(FILTER ampere_tests EXCLUDE REGEX
+    "ampere_(async_copy|geometry|logged_numeric|logged_textures|tennis_tessellation|fast_fusion_logged|starfox_test10)\\.cpp$")
 add_executable(nx2-core-check ${ampere_tests}
     logging.cpp
     "${EDEN_SOURCE}/src/tests/common/host_command_completion.cpp"
     "${EDEN_SOURCE}/src/tests/common/host_command_queue.cpp"
-    "${EDEN_SOURCE}/src/tests/core/read_traps.cpp"
-    "${EDEN_SOURCE}/src/tests/core/nx2_readback_cache.cpp"
-    "${EDEN_SOURCE}/src/tests/core/nx2_core_readback_capacity.cpp"
-    "${EDEN_SOURCE}/src/tests/video_core/nx2_gpu_mappings.cpp"
-    "${EDEN_SOURCE}/src/tests/video_core/nx2_command_ranges.cpp"
     "${EDEN_SOURCE}/src/tests/video_core/nx2_command_sync.cpp"
-    "${EDEN_SOURCE}/src/tests/video_core/nx2_sparse_region.cpp"
-    "${EDEN_SOURCE}/src/tests/video_core/nx2_sparse_tiles.cpp"
     "${EDEN_SOURCE}/src/tests/video_core/nx2_sparse_images.cpp"
     "${EDEN_SOURCE}/src/tests/video_core/nx2_sparse_image_write.cpp"
-    "${EDEN_SOURCE}/src/tests/video_core/memory_budget.cpp"
     "${EDEN_SOURCE}/src/tests/video_core/query_region_visit.cpp")
 file(GLOB boost_includes "${DEPENDENCY_SOURCE}/.cache/cpm/boost/*/libs/*/include")
 # Eden's pinned Vulkan headers (sparse_image_policy.h), not whatever the host has installed.

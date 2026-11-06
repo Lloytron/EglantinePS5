@@ -318,6 +318,11 @@ file(WRITE "${MULTIPLAYER_OUTPUT}/network_interface.cpp.in" "${interface_source}
 configure_file("${MULTIPLAYER_OUTPUT}/network_interface.cpp.in"
     "${MULTIPLAYER_OUTPUT}/network_interface.cpp" COPYONLY)
 
+# Lichii rewrote socket_proxy and bsd (its own EmulatedPoll, locking and close handling); the
+# port's PollProxy/SocketDescriptors layer has not been re-ported onto them yet. Off by default:
+# the build then uses Lichii's own socket_proxy and bsd unchanged.
+option(EDEN_PS5_PROXY_SOCKETS "Splice the port's multiplayer layer into socket_proxy and bsd" OFF)
+if(EDEN_PS5_PROXY_SOCKETS)
 file(READ "${MULTIPLAYER_SOURCE}/src/core/internal_network/socket_proxy.h" proxy_header)
 multiplayer_replace(proxy_header "    bool IsOpened() const override;"
     "    bool IsOpened() const override;\n    std::optional<PollEvents> PollProxy(PollEvents events) override;")
@@ -471,6 +476,7 @@ multiplayer_replace(bsd_source "file_descriptors[fd]" "descriptor_entry")
 string(APPEND bsd_source "\nnamespace Service::Sockets {\n#include \"multiplayer_bsd.inc\"\n}\n")
 file(WRITE "${MULTIPLAYER_OUTPUT}/bsd.cpp.in" "${bsd_source}")
 configure_file("${MULTIPLAYER_OUTPUT}/bsd.cpp.in" "${MULTIPLAYER_OUTPUT}/bsd.cpp" COPYONLY)
+endif()
 
 if(TARGET network)
     get_target_property(packet_sources network SOURCES)
@@ -488,11 +494,14 @@ if(TARGET network)
 endif()
 if(TARGET core)
     get_target_property(ldn_sources core SOURCES)
-    list(REMOVE_ITEM ldn_sources hle/service/ldn/lan_discovery.cpp internal_network/socket_proxy.cpp internal_network/network.cpp internal_network/network_interface.cpp hle/service/sockets/bsd.cpp)
-    set_property(TARGET core PROPERTY SOURCES "${ldn_sources}")
+    list(REMOVE_ITEM ldn_sources hle/service/ldn/lan_discovery.cpp internal_network/network.cpp internal_network/network_interface.cpp)
     target_sources(core PRIVATE "${MULTIPLAYER_OUTPUT}/lan_discovery.cpp"
-        "${MULTIPLAYER_OUTPUT}/socket_proxy.cpp" "${MULTIPLAYER_OUTPUT}/socket_network.cpp"
-        "${MULTIPLAYER_OUTPUT}/network_interface.cpp" "${MULTIPLAYER_OUTPUT}/bsd.cpp")
+        "${MULTIPLAYER_OUTPUT}/socket_network.cpp" "${MULTIPLAYER_OUTPUT}/network_interface.cpp")
+    if(EDEN_PS5_PROXY_SOCKETS)
+        list(REMOVE_ITEM ldn_sources internal_network/socket_proxy.cpp hle/service/sockets/bsd.cpp)
+        target_sources(core PRIVATE "${MULTIPLAYER_OUTPUT}/socket_proxy.cpp" "${MULTIPLAYER_OUTPUT}/bsd.cpp")
+    endif()
+    set_property(TARGET core PROPERTY SOURCES "${ldn_sources}")
     target_include_directories(core BEFORE PRIVATE "${MULTIPLAYER_SOCKET_HEADERS}" "${MULTIPLAYER_OUTPUT}")
     target_include_directories(core PRIVATE "${CMAKE_CURRENT_LIST_DIR}")
     target_link_libraries(core PRIVATE zstd::zstd)

@@ -536,10 +536,13 @@ int main(int argc, char** argv) {
         // pages with nothing to flush answer on the guest core instead of waiting for the GPU
         // thread, as they do with fastmem (Mario Kart World's title screen: 13 -> 20 FPS). The
         // three waits poll 300 us before sleeping: a wake-up here is a system call on both sides.
+        // VMA blocks stay 64 MiB as before the Lichii merge (the core's default is now 16 MiB;
+        // docs/MKW-TITLE-FPS.md measured 16 MiB at 19.5 FPS on the console).
         for (const auto& [name, value] : {std::pair{"EDEN_NX2_UNSAFE_PREEMPTIVE_READS", "1"},
                                           std::pair{"EDEN_PS5_READ_SPIN_US", "300"},
                                           std::pair{"EDEN_PS5_GPU_SPIN_US", "300"},
-                                          std::pair{"EDEN_PS5_WORKER_SPIN_US", "300"}}) {
+                                          std::pair{"EDEN_PS5_WORKER_SPIN_US", "300"},
+                                          std::pair{"EDEN_PS5_VMA_BLOCK_MIB", "64"}}) {
             setenv(name, value, 0);
         }
 #ifdef EDEN_MKW_DIAGNOSTICS
@@ -1172,16 +1175,13 @@ int main(int argc, char** argv) {
             {
                 // Donkey Kong Bananza's update needs its HMMA compute shaders expanded in software
                 // (patch 0009); other titles keep skipping them, as Mario Kart World's frame rate
-                // was measured. A value from env.txt wins.
+                // was measured. In the Lichii core an unset EDEN_NX2_SOFT_HMMA lowers HMMA and only
+                // =0 skips the programs, so the port sets 0 for every other title. A value from
+                // env.txt wins.
                 static bool soft_hmma_by_port = false;
-                if (title == 0x040074A01BF12000ULL) {
-                    if (std::getenv("EDEN_NX2_SOFT_HMMA") == nullptr) {
-                        setenv("EDEN_NX2_SOFT_HMMA", "1", 1);
-                        soft_hmma_by_port = true;
-                    }
-                } else if (soft_hmma_by_port) {
-                    unsetenv("EDEN_NX2_SOFT_HMMA");
-                    soft_hmma_by_port = false;
+                if (soft_hmma_by_port || std::getenv("EDEN_NX2_SOFT_HMMA") == nullptr) {
+                    setenv("EDEN_NX2_SOFT_HMMA", title == 0x040074A01BF12000ULL ? "1" : "0", 1);
+                    soft_hmma_by_port = true;
                 }
             }
             const auto all_mods = Eden::Mods::List(Eden::AssetsPath("mods"), title);
@@ -1694,7 +1694,8 @@ int main(int argc, char** argv) {
                                 VideoCommon::LoadingProbe::capture_enabled = true;
                                 LOG_CRITICAL(HW_GPU, "MKW GPFIFO ring armed, maximum8MiB/4096records");
                             }
-                            if (diagnostic_sample == 4) Tegra::GpfifoCapture::Flush("mkw-loading-snapshot");
+                            // Tegra::GpfifoCapture is gone in Lichii; dma_pusher writes last-large.bin
+                            // directly while capture_enabled is set, so there is nothing to flush.
                             const auto report = [](const char* name, auto& channel) {
                                 LOG_CRITICAL(Render_Vulkan, "MKW progress {} phase={} arg={:#x} serial={}", name,
                                     channel.phase.load(), channel.argument.load(), channel.serial.load());

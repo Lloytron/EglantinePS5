@@ -15,19 +15,23 @@ The PS5 GPU is Mesa's `CHIP_GFX1013` ("GFX10 plus ray tracing instructions";
 | Packed 16-bit math (`v_pk_*`) | yes (`has_packed_math_16bit`) | ACO vectorizes 16-bit ALU on its own |
 | Mixed-precision FMA (`v_fma_mix_f32`) | yes | ACO folds f16->f32 conversions into FMAs on its own |
 | Wave32 compute, DPP, `ds_bpermute` | yes | quad-local shuffles become DPP; others `ds_bpermute` |
-| Cooperative matrices / WMMA | no (RDNA3+) | HMMA is emulated (phase 1, `HMMA_NATIVE`) |
+| Cooperative matrices / WMMA | no (RDNA3+) | HMMA is emulated (Lichii's compact software collective by default; phase 1 `HMMA_NATIVE` with `EDEN_NX2_HMMA_NATIVE=1`) |
 
 ## Measurements
 
 `EDEN_NX2_PIPELINE_STATS=1` (patch 0014) logs the driver's own statistics
 (`VK_KHR_pipeline_executable_properties`) of every compute pipeline of 5000 or more instructions
 (`NX2_PIPELINE_STATS` in `eden_log.txt`). `EDEN_NX2_IR_STATS=1` (patch 0013) logs the emulator IR.
-Bananza, fresh shader cache, same binary, switches in `env.txt`; shader 1 / shader 2:
+Bananza, fresh shader cache, same binary, switches in `env.txt`; shader 1 / shader 2. Measured on
+the pre-Lichii core, where native HMMA was the default and `EDEN_NX2_HMMA_NATIVE=0` selected the
+Maxwell sequence. Since the Lichii merge native HMMA is opt-in (`EDEN_NX2_HMMA_NATIVE=1`); unset,
+the core emits Lichii's compact software collective (`TENSOR_MUL_ADD`, a shared SPIR-V loop
+helper), which is not measured here, and the Maxwell sequence is no longer selectable by switch:
 
 | Variant | IR instructions | GPU instructions | Copies | Latency | Binary hash |
 | --- | --- | --- | --- | --- | --- |
-| HMMA as Maxwell sequence (`EDEN_NX2_HMMA_NATIVE=0`) | 303,593 / 227,096 | 27,029 / 20,200 | 1,259 / 906 | 20,892 / 15,818 | 1320380089 / 1452194145 |
-| Native HMMA (phase 1) | 93,161 / 69,272 | 26,106 / 19,418 | 683 / 475 | 20,261 / 15,276 | 3680626914 / 2400222582 |
+| HMMA as Maxwell sequence (pre-Lichii `EDEN_NX2_HMMA_NATIVE=0`) | 303,593 / 227,096 | 27,029 / 20,200 | 1,259 / 906 | 20,892 / 15,818 | 1320380089 / 1452194145 |
+| Native HMMA (phase 1, `EDEN_NX2_HMMA_NATIVE=1`) | 93,161 / 69,272 | 26,106 / 19,418 | 683 / 475 | 20,261 / 15,276 | 3680626914 / 2400222582 |
 | + A fragments as `QuadBroadcast` (DPP) | 94,505 / 70,280 | 26,106 / 19,418 | 683 / 475 | 20,261 / 15,276 | **same** |
 | + f16 operands converted at the FMA (`v_fma_mix` form) | 113,705 / 84,680 | 26,106 / 19,418 | 683 / 475 | 20,261 / 15,276 | **same** |
 
@@ -58,7 +62,7 @@ Mesa cannot see the pattern.
     # env.txt on the console, fresh shader cache (the Bananza driver in .local/mb isolates it)
     EDEN_NX2_IR_STATS=1
     EDEN_NX2_PIPELINE_STATS=1
-    EDEN_NX2_HMMA_NATIVE=0      # old Maxwell sequence (default: native)
+    EDEN_NX2_HMMA_NATIVE=1      # native HMMA (opt-in; default: Lichii's compact collective)
 
 `VK_PIPELINE_CREATE_CAPTURE_INTERNAL_REPRESENTATIONS_BIT_KHR` (NIR, ACO IR and disassembly) runs
 the console out of memory on these shaders; `RADV_DEBUG=shaderstats` stalls the app.

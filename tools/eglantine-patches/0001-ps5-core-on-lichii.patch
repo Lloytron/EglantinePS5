@@ -2065,10 +2065,10 @@ index 00000000..810a31e4
 +}
 diff --git a/src/tests/video_core/ampere_mesh.cpp b/src/tests/video_core/ampere_mesh.cpp
 new file mode 100644
-index 00000000..8a02f4e0
+index 00000000..15302ec3
 --- /dev/null
 +++ b/src/tests/video_core/ampere_mesh.cpp
-@@ -0,0 +1,74 @@
+@@ -0,0 +1,81 @@
 +// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
 +// SPDX-License-Identifier: GPL-3.0-or-later
 +
@@ -2135,9 +2135,16 @@ index 00000000..8a02f4e0
 +    INFO(lowered.error);
 +    REQUIRE(lowered);
 +    REQUIRE(lowered.instructions[0] == (0x5c08000000070000ULL | 218 | (u64{219} << 20)));
++    // UR16 and up are mapped too (UR16 lives in R232), as destination and as source.
++    const auto high_dest = LowerToMaxwell(std::array{Instruction{{0x001072bf, 3, 0x08000000, 0}}, Exit});
++    INFO(high_dest.error);
++    REQUIRE(high_dest);
++    REQUIRE(high_dest.instructions[0] == (0x5c08000000070000ULL | 232 | (u64{219} << 20)));
++    const auto high_source = LowerToMaxwell(std::array{Instruction{{0x000272bf, 16, 0x08000000, 0}}, Exit});
++    INFO(high_source.error);
++    REQUIRE(high_source);
++    REQUIRE(high_source.instructions[0] == (0x5c08000000070000ULL | 218 | (u64{232} << 20)));
 +    for (const Instruction invalid : std::array{
-+             Instruction{{0x001072bf, 3, 0x08000000, 0}},
-+             Instruction{{0x000272bf, 16, 0x08000000, 0}},
 +             Instruction{{0x000262bf, 3, 0x08000000, 0}},
 +             Instruction{{0x000272bf, 3, 0, 0}}}) {
 +        REQUIRE_FALSE(LowerToMaxwell(std::array{invalid, Exit}));

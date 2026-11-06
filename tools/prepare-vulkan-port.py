@@ -70,7 +70,7 @@ constexpr VkPipelineStageFlags COMPUTE_CONSUMER_STAGES =
 } // namespace
 
 void RasterizerVulkan::DispatchCompute() {"""),
-    ('        scheduler.RequestOutsideRenderPassOperationContext();\n        scheduler.Record([pipeline, indirect_buffer = buffer->Handle(),',
+    ('        scheduler.RequestOutsideRenderPassOperationContext();\n        scheduler.TraceComputePipeline(pipeline->ShaderHash());\n        scheduler.Record([this, pipeline, indirect_buffer = buffer->Handle(),',
      """        scheduler.RequestOutsideRenderPassOperationContext();
         if (::Eden::DevVulkan::compute_barriers) {
             scheduler.Record([](vk::CommandBuffer cmdbuf) {
@@ -79,15 +79,20 @@ void RasterizerVulkan::DispatchCompute() {"""),
                                        0, COMPUTE_INPUT_BARRIER);
             });
         }
-        scheduler.Record([pipeline, indirect_buffer = buffer->Handle(),"""),
-    ('            cmdbuf.DispatchIndirect(indirect_buffer, indirect_offset);\n',
-     """            cmdbuf.DispatchIndirect(indirect_buffer, indirect_offset);
+        scheduler.TraceComputePipeline(pipeline->ShaderHash());
+        scheduler.Record([this, pipeline, indirect_buffer = buffer->Handle(),"""),
+    # Lichii wraps the dispatch in scheduler.TraceGpuWork(..., [&] { ... }): the barrier goes
+    # after that call, so it is outside the traced GPU work.
+    ('                cmdbuf.DispatchIndirect(indirect_buffer, indirect_offset);\n            });\n',
+     """                cmdbuf.DispatchIndirect(indirect_buffer, indirect_offset);
+            });
             if (::Eden::DevVulkan::compute_barriers)
                 cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, COMPUTE_CONSUMER_STAGES, 0,
                                        COMPUTE_WRITE_BARRIER);
 """),
-    ('        cmdbuf.Dispatch(dim[0], dim[1], dim[2]);\n',
-     """        cmdbuf.Dispatch(dim[0], dim[1], dim[2]);
+    # Before Lichii's byte-addressed shadow copy-back, which reads what the dispatch wrote.
+    ('                               [&] { cmdbuf.Dispatch(dim[0], dim[1], dim[2]); });\n',
+     """                               [&] { cmdbuf.Dispatch(dim[0], dim[1], dim[2]); });
         if (::Eden::DevVulkan::compute_barriers)
             cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, COMPUTE_CONSUMER_STAGES, 0,
                                    COMPUTE_WRITE_BARRIER);
@@ -114,13 +119,30 @@ void RasterizerVulkan::DispatchCompute() {"""),
     ('        std::scoped_lock lock{texture_cache.mutex};\n        texture_cache.WriteMemory(addr, size);\n    }\n    pipeline_cache.InvalidateRegion(addr, size);',
      '        ::Eden::Performance::GuestCacheLock(texture_cache.mutex);\n'
      '        std::lock_guard lock{texture_cache.mutex, std::adopt_lock};\n        texture_cache.WriteMemory(addr, size);\n    }\n    pipeline_cache.InvalidateRegion(addr, size);'),
-    # The upstream code has an __ANDROID__ ifdef for DRAWS_TO_DISPATCH (512 vs 4096) and
-    # CHECK_MASK (3 vs 7). Neither branch applies: replace the whole block. 512 draws per
-    # command buffer submission: 4,096 exceeds the PS5 GPU watchdog timeout in shader-heavy
-    # scenes (VK_ERROR_DEVICE_LOST in Xenoblade 2's cities). CHECK_MASK is the configurable
-    # dispatch interval (dev-settings dispatch_draws=N); default 64 draws between hand-offs.
-    ('#ifdef __ANDROID__\n    static constexpr u32 DRAWS_TO_DISPATCH = 512;\n    static constexpr u32 CHECK_MASK = 3;\n#else\n    // Every 32 draws (was 8): each dispatch woke the worker thread, and Switch 2 titles make\n    // ~55,000 draws a second. A full chunk is dispatched on its own (Scheduler::Record).\n    static constexpr u32 DRAWS_TO_DISPATCH = 4096;\n    static constexpr u32 CHECK_MASK = 31;\n#endif // __ANDROID__\n\n    static_assert(DRAWS_TO_DISPATCH % (CHECK_MASK + 1) == 0);\n',
-     '    static constexpr u32 DRAWS_TO_DISPATCH = 512;\n    const u32 CHECK_MASK = ::Eden::Performance::dispatch_mask.load(std::memory_order_relaxed);\n\n'),
+    # FlushWork's legacy (non-native-tiling) path submits every 4,096 draws and hands off every 32
+    # (SubmissionPolicy::Advance). Neither applies here: 512 draws per command buffer submission,
+    # because 4,096 exceeds the PS5 GPU watchdog timeout in shader-heavy scenes
+    # (VK_ERROR_DEVICE_LOST in Xenoblade 2's cities); CHECK_MASK is the configurable dispatch
+    # interval (dev-settings dispatch_draws=N); default 64 draws between hand-offs. Lichii's
+    # native-tiling path (Switch 2 titles: flush every 128 draws, or EDEN_NX2_FLUSH_DRAWS, and
+    # pending_native_work) is already under that watchdog limit and is left as it is.
+    ('    const bool native = gpu_memory->UsesNativeTiling();\n    u32 budget = SubmissionPolicy::DefaultNativeBudget;\n',
+     '    const bool native = gpu_memory->UsesNativeTiling();\n'
+     '    if (!native) {\n'
+     '        static constexpr u32 DRAWS_TO_DISPATCH = 512;\n'
+     '        const u32 CHECK_MASK = ::Eden::Performance::dispatch_mask.load(std::memory_order_relaxed);\n'
+     '        if ((++draw_counter & CHECK_MASK) != CHECK_MASK) {\n'
+     '            return;\n'
+     '        }\n'
+     '        if (draw_counter < DRAWS_TO_DISPATCH) {\n'
+     '            scheduler.DispatchWork();\n'
+     '            return;\n'
+     '        }\n'
+     '        scheduler.Flush();\n'
+     '        draw_counter = 0;\n'
+     '        return;\n'
+     '    }\n'
+     '    u32 budget = SubmissionPolicy::DefaultNativeBudget;\n'),
     # Where the ~4 us a draw spends goes: six phases under one running clock, each Mark taking the
     # gap since the previous one so they do not overlap. The Timer still wraps the whole function,
     # so a draw that returns early is charged for its unmarked tail and the sum of the six falls
@@ -150,9 +172,12 @@ void RasterizerVulkan::DispatchCompute() {"""),
     }()};
     ::Eden::Performance::Mark(::Eden::Performance::draw_pipeline, phase);
 '''),
+    # Lichii's vertex-repack block now sits between SetEngine and Configure: adapt()'s fallback
+    # carries it over (the Mark stays right after SetEngine, so draw_config includes the repack).
     ('''    pipeline->SetEngine(maxwell3d, gpu_memory);
     if (Profile::Scope scope{Profile::Zone::Configure}; !pipeline->Configure(is_indexed)) {
         report_failure("configure failed");
+        TraceRenderState(is_indexed, "configure-failed", nullptr);
         return;
     }
 ''',
@@ -162,6 +187,7 @@ void RasterizerVulkan::DispatchCompute() {"""),
     ::Eden::Performance::Mark(::Eden::Performance::draw_lock_wait, phase);
     if (Profile::Scope scope{Profile::Zone::Configure}; !pipeline->Configure(is_indexed)) {
         report_failure("configure failed");
+        TraceRenderState(is_indexed, "configure-failed", nullptr);
         return;
     }
     ::Eden::Performance::Mark(::Eden::Performance::draw_config, phase);
@@ -169,6 +195,8 @@ void RasterizerVulkan::DispatchCompute() {"""),
     ('''    query_cache.CounterEnable(VideoCommon::QueryType::ZPassPixelCount64, maxwell3d->regs.zpass_pixel_count_enable);
     {
         Profile::Scope scope{Profile::Zone::DrawRecord};
+        scheduler.TraceGraphicsPipeline(pipeline->ShaderHashes());
+        trace_draw_hashes = {pipeline->ShaderHashes()[1], pipeline->ShaderHashes()[5]};
         draw_func();
     }
 ''',
@@ -176,6 +204,8 @@ void RasterizerVulkan::DispatchCompute() {"""),
     ::Eden::Performance::Mark(::Eden::Performance::draw_state, phase);
     {
         Profile::Scope scope{Profile::Zone::DrawRecord};
+        scheduler.TraceGraphicsPipeline(pipeline->ShaderHashes());
+        trace_draw_hashes = {pipeline->ShaderHashes()[1], pipeline->ShaderHashes()[5]};
         draw_func();
     }
     ::Eden::Performance::Mark(::Eden::Performance::draw_record, phase);
@@ -192,14 +222,14 @@ void RasterizerVulkan::DispatchCompute() {"""),
     # UpdateDynamicStates asked the cache for the current pipeline a second time
     # per draw, recomputing the same fixed-state key. Reuse PrepareDraw's result;
     # other callers keep the original lookup.
-    ('template <typename Func>\nvoid RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {',
+    ('template <typename Func>\nvoid RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func, bool is_indirect) {',
      '''namespace {
 // GPU thread only: the pipeline PrepareDraw refreshed for the draw in progress.
 GraphicsPipeline* prepared_pipeline = nullptr;
 } // namespace
 
 template <typename Func>
-void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func) {'''),
+void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func, bool is_indirect) {'''),
     ('    std::scoped_lock lock{buffer_cache.mutex, texture_cache.mutex};\n    buffer_cache_runtime.BeginReadbackWriteBatch();\n    SCOPE_EXIT { buffer_cache_runtime.AbortReadbackWriteBatch(); };\n    // update engine as channel may be different.',
      '''    std::scoped_lock lock{buffer_cache.mutex, texture_cache.mutex};
     buffer_cache_runtime.BeginReadbackWriteBatch();
@@ -268,9 +298,11 @@ adapt('src/video_core/renderer_vulkan/vk_query_cache.cpp', 'vulkan_query_cache.c
     ('''bool QueryCacheRuntime::HostConditionalRenderingCompareValue(VideoCommon::LookupData object_1,
                                                              [[maybe_unused]] bool qc_dirty) {
     if (!impl->device.IsExtConditionalRendering()) {
+        TraceConditionalRendering("extension-unavailable", false, object_1.address);
         return false;
     }
     HostConditionalRenderingCompareBCImpl(object_1.address, true, true);
+    TraceConditionalRendering("resolve-zero", true, object_1.address);
     return true;
 }''',
      '''namespace {
@@ -308,6 +340,7 @@ bool HostConditionalRenderingOnCpu(QueryCacheRuntime& runtime, QueryCacheRuntime
 bool QueryCacheRuntime::HostConditionalRenderingCompareValue(VideoCommon::LookupData object_1,
                                                              [[maybe_unused]] bool qc_dirty) {
     if (!impl->device.IsExtConditionalRendering()) {
+        TraceConditionalRendering("extension-unavailable", false, object_1.address);
         return false;
     }
     if (::Eden::DevVulkan::hcr_mode == 2) {
@@ -320,14 +353,17 @@ bool QueryCacheRuntime::HostConditionalRenderingCompareValue(VideoCommon::Lookup
     }
     ::Eden::Performance::CountCondition(16);
     HostConditionalRenderingCompareBCImpl(object_1.address, true, true);
+    TraceConditionalRendering("resolve-zero", true, object_1.address);
     return true;
 }'''),
     ('''    if (!impl->device.IsExtConditionalRendering()) {
+        TraceConditionalRendering("extension-unavailable", false, object_1.address, object_2.address);
         return false;
     }
 
     const auto check_in_bc = [&](DAddr address) {''',
      '''    if (!impl->device.IsExtConditionalRendering()) {
+        TraceConditionalRendering("extension-unavailable", false, object_1.address, object_2.address);
         return false;
     }
     if (::Eden::DevVulkan::hcr_mode == 2) {
@@ -337,23 +373,27 @@ bool QueryCacheRuntime::HostConditionalRenderingCompareValue(VideoCommon::Lookup
     const auto check_in_bc = [&](DAddr address) {'''),
     ('''    if (!is_in_ac[0] && !is_in_ac[1]) {
         EndHostConditionalRendering();
+        TraceConditionalRendering("uncached", false, object_1.address, object_2.address);
         return false;
     }
 
     if (!qc_dirty && !is_in_bc[0] && !is_in_bc[1]) {
         EndHostConditionalRendering();
+        TraceConditionalRendering("guest-synchronized", false, object_1.address, object_2.address);
         return false;
     }
 ''',
      '''    if (!is_in_ac[0] && !is_in_ac[1]) {
         ::Eden::Performance::CountCondition(13);
         EndHostConditionalRendering();
+        TraceConditionalRendering("uncached", false, object_1.address, object_2.address);
         return false;
     }
 
     if (!qc_dirty && !is_in_bc[0] && !is_in_bc[1]) {
         ::Eden::Performance::CountCondition(13);
         EndHostConditionalRendering();
+        TraceConditionalRendering("guest-synchronized", false, object_1.address, object_2.address);
         return false;
     }
     // hcr=exact: a pending host query is not in any buffer yet; the CPU evaluation waits for it.
@@ -363,18 +403,20 @@ bool QueryCacheRuntime::HostConditionalRenderingCompareValue(VideoCommon::Lookup
         return false;
     }
 '''),
-    ('''            HostConditionalRenderingCompareValueImpl(*objects[j], equal_check);
-            return true;''',
-     '''            ::Eden::Performance::CountCondition(15);
-            HostConditionalRenderingCompareValueImpl(*objects[j], equal_check);
-            return true;'''),
+    ('''            size_t j = (i + 1) % 2;
+            HostConditionalRenderingCompareValueImpl(*objects[j], equal_check);''',
+     '''            size_t j = (i + 1) % 2;
+            ::Eden::Performance::CountCondition(15);
+            HostConditionalRenderingCompareValueImpl(*objects[j], equal_check);'''),
     ('''    if (!is_gpu_high) {
         EndHostConditionalRendering();
+        TraceConditionalRendering("accuracy-bypass", true, object_1.address, object_2.address);
         return true;
     }
 
     if (!is_in_bc[0] && !is_in_bc[1]) {
         EndHostConditionalRendering();
+        TraceConditionalRendering("query-cache-bypass", true, object_1.address, object_2.address);
         return true;
     }
     HostConditionalRenderingCompareBCImpl(object_1.address, equal_check);''',
@@ -382,7 +424,10 @@ bool QueryCacheRuntime::HostConditionalRenderingCompareValue(VideoCommon::Lookup
     if (!is_gpu_high || (!is_in_bc[0] && !is_in_bc[1])) {
         ::Eden::Performance::CountCondition(14);
         EndHostConditionalRendering();
-        return ::Eden::DevVulkan::hcr_mode != 1;
+        const bool handled = ::Eden::DevVulkan::hcr_mode != 1;
+        TraceConditionalRendering(!is_gpu_high ? "accuracy-bypass" : "query-cache-bypass", handled,
+                                  object_1.address, object_2.address);
+        return handled;
     }
     ::Eden::Performance::CountCondition(16);
     HostConditionalRenderingCompareBCImpl(object_1.address, equal_check);'''),
@@ -499,8 +544,8 @@ adapt('src/video_core/vulkan_common/vulkan_memory_allocator.cpp', 'vulkan_memory
      '            vmaCalculateStatistics(allocator, &statistics);\n'
      '            if (probe_rows == 160 || probe_rows == 256 || probe_rows == 512 || result != VK_SUCCESS)\n'
      '                EdenVmaSnapshot(allocator, probe_rows);'),
-    ('vk::Image MemoryAllocator::CreateUnbackedImage(const VkImageCreateInfo &ci) const {',
-     (port / 'transient_images.inc').read_text() + '\nvk::Image MemoryAllocator::CreateUnbackedImage(const VkImageCreateInfo &ci) const {'),
+    ('vk::Image MemoryAllocator::CreateUnbackedImage(const VkImageCreateInfo &ci, bool aliased) const {',
+     (port / 'transient_images.inc').read_text() + '\nvk::Image MemoryAllocator::CreateUnbackedImage(const VkImageCreateInfo &ci, bool aliased) const {'),
     ('MemoryAllocator::MemoryAllocator(const Device &device_)',
      r'''namespace {
 std::mutex vma_probe_mutex;
@@ -780,11 +825,13 @@ adapt('src/video_core/renderer_vulkan/vk_scheduler.h',
      '    std::condition_variable_any event_cv;\n    std::condition_variable drain_cv;\n    unsigned drain_waiters{};'),
 ])
 adapt('src/video_core/renderer_vulkan/vk_scheduler.cpp', 'vulkan_scheduler.cpp', [
-    ('Scheduler::~Scheduler() = default;',
-     'Scheduler::~Scheduler() {\n'
+    # Lichii's destructor stops the worker only when its trace query pool exists; stop it in any
+    # case so GpuTimeReset runs after the worker's last GpuTimeCollect.
+    ('            master_semaphore->Wait(trace_gpu_tick);\n        }\n    }\n}\n',
+     '            master_semaphore->Wait(trace_gpu_tick);\n        }\n    }\n'
      '    worker_thread.request_stop();\n'
      '    if (worker_thread.joinable()) worker_thread.join();\n'
-     '    GpuTimeReset(device);\n}'),
+     '    GpuTimeReset(device);\n}\n'),
     ('        event_cv.wait(ql, [this] { return work_queue.empty(); });',
      '        ++drain_waiters;\n        drain_cv.wait(ql, [this] { return work_queue.empty(); });\n        --drain_waiters;'),
     ('            event_cv.notify_all();', '            if (eden_vulkan_handoff_enabled()) event_cv.notify_one();\n            else event_cv.notify_all();'),
@@ -793,27 +840,28 @@ adapt('src/video_core/renderer_vulkan/vk_scheduler.cpp', 'vulkan_scheduler.cpp',
 
     ('#include <memory>', '#include <memory>\n#include <array>\n#include <chrono>\n#include <cstdio>\n#include "dev_vulkan.h"\n#include "submission_origin.h"\nextern "C" bool eden_vulkan_handoff_enabled();'),
     ('namespace Vulkan {\n', 'namespace Vulkan {\n' + GPU_TIME_HELPERS),
-    ('        .pInheritanceInfo = nullptr,\n    });\n}\n\nu64 Scheduler::SubmitExecution(',
-     '        .pInheritanceInfo = nullptr,\n    });\n    GpuTimeBegin(device, current_upload_cmdbuf);\n}\n\nu64 Scheduler::SubmitExecution('),
-    ('u64 Scheduler::Flush(VkSemaphore signal_semaphore, VkSemaphore wait_semaphore) {',
-     'u64 Scheduler::Flush(VkSemaphore signal_semaphore, VkSemaphore wait_semaphore) {\n'
+    ('        .pInheritanceInfo = nullptr,\n    });\n    if (trace_query_pool && !trace_gpu_failed) {\n        TraceGpuSubmission();\n    }\n}\n',
+     '        .pInheritanceInfo = nullptr,\n    });\n    GpuTimeBegin(device, current_upload_cmdbuf);\n'
+     '    if (trace_query_pool && !trace_gpu_failed) {\n        TraceGpuSubmission();\n    }\n}\n'),
+    ('u64 Scheduler::Flush(VkSemaphore signal_semaphore, VkSemaphore wait_semaphore,\n                     std::source_location location) {',
+     'u64 Scheduler::Flush(VkSemaphore signal_semaphore, VkSemaphore wait_semaphore,\n                     std::source_location location) {\n'
      '    GpuSubmitOriginScope origin{__builtin_return_address(0), false, true};'),
-    ('void Scheduler::Finish(VkSemaphore signal_semaphore, VkSemaphore wait_semaphore) {',
-     'void Scheduler::Finish(VkSemaphore signal_semaphore, VkSemaphore wait_semaphore) {\n'
+    ('void Scheduler::Finish(VkSemaphore signal_semaphore, VkSemaphore wait_semaphore,\n                       std::source_location location) {',
+     'void Scheduler::Finish(VkSemaphore signal_semaphore, VkSemaphore wait_semaphore,\n                       std::source_location location) {\n'
      '    GpuSubmitOriginScope origin{__builtin_return_address(0), true, true};'),
     ('    RecordWithUploadBuffer([signal_semaphore, wait_semaphore, signal_value,',
      '    RecordWithUploadBuffer([signal_semaphore, wait_semaphore, signal_value,\n'
      '                            submit_origin = gpu_submit_origin,'),
     ('        cmdbuf.End();\n\n        if (on_submit)',
      '        GpuTimeEnd(cmdbuf);\n        cmdbuf.End();\n\n        if (on_submit)'),
-    ('            vk::Check(result);\n            break;\n        }\n    });\n    chunk->MarkSubmit();',
+    ('            vk::Check(result);\n            break;\n        }\n        if (trace_frame_end != 0) {',
      '            vk::Check(result);\n            break;\n        }\n'
-     '        GpuTimeCountOrigin(submit_origin);\n        GpuTimeCollect(device);\n    });\n    chunk->MarkSubmit();'),
+     '        GpuTimeCountOrigin(submit_origin);\n        GpuTimeCollect(device);\n        if (trace_frame_end != 0) {'),
     ('    const u64 signal_value = SubmitExecution(signal_semaphore, wait_semaphore);\n'
-     '    AllocateNewContext();\n    return signal_value;',
+     '    AllocateNewContext();\n    last_flush = std::chrono::steady_clock::now();',
      '    const u64 signal_value = SubmitExecution(signal_semaphore, wait_semaphore);\n'
      '    if (::Eden::DevVulkan::sync_submissions) {\n        Wait(signal_value);\n    }\n'
-     '    AllocateNewContext();\n    return signal_value;'),
+     '    AllocateNewContext();\n    last_flush = std::chrono::steady_clock::now();'),
 ])
 adapt('src/video_core/renderer_vulkan/pipeline_helper.h',
       'include/video_core/renderer_vulkan/pipeline_helper.h', [
@@ -849,14 +897,14 @@ adapt('src/video_core/renderer_vulkan/renderer_vulkan.cpp', 'vulkan_renderer.cpp
     # A frame the display has no refresh for is not presented: a game patched for more frames
     # than the output shows keeps its pace instead of waiting for a refresh per frame
     # (headless/display_refresh.h). The frame still ends as any other.
-    ('    RenderScreenshot(framebuffers);\n    Frame* frame = present_manager.GetRenderFrame();',
+    # (Lichii's DKB frame trace timestamps sit between these lines; a skipped frame is not traced.)
+    ('    RenderScreenshot(framebuffers);\n',
      '    RenderScreenshot(framebuffers);\n'
      '    if (::Eden::Display::SkipFrame()) {\n'
      '        gpu.RendererFrameEndNotify();\n'
      '        rasterizer.TickFrame();\n'
      '        return;\n'
-     '    }\n'
-     '    Frame* frame = present_manager.GetRenderFrame();'),
+     '    }\n'),
     ('    Report();', '    PresentLoading();\n    Report();'),
     ('swapchain.GetImageViewFormat());', 'swapchain.GetImageViewFormat(), true);'),
     ('layout, 1, format);', 'layout, 1, format, true);'),
@@ -865,8 +913,13 @@ adapt('src/video_core/renderer_vulkan/renderer_vulkan.cpp', 'vulkan_renderer.cpp
     # Present() only records the hand-off into a fresh chunk. Dispatch it now so
     # the present thread gets this frame immediately instead of after the
     # producer's next 8-draw dispatch (upstream does this only with LSFG).
-    ('    present_manager.Present(frame);\n#ifdef HAS_LSFG\n    scheduler.DispatchWork();\n#endif',
+    ('    present_manager.Present(frame);\n'
+     '    const auto presented = trace ? std::chrono::steady_clock::now()\n'
+     '                                 : std::chrono::steady_clock::time_point{};\n'
+     '#ifdef HAS_LSFG\n    scheduler.DispatchWork();\n#endif',
      '    present_manager.Present(frame);\n    Eden::CountPresentedFrame();\n'
+     '    const auto presented = trace ? std::chrono::steady_clock::now()\n'
+     '                                 : std::chrono::steady_clock::time_point{};\n'
      '    scheduler.DispatchWork();'),
     ('} // namespace Vulkan', '''} // namespace Vulkan
 namespace Eden {
@@ -1045,13 +1098,14 @@ adapt('src/video_core/texture_cache/texture_cache.h',
 # the texture-buffer loop looked like the cost of bind and measured 2.8%.
 adapt('src/video_core/buffer_cache/buffer_cache.h',
       'vulkan-cache/video_core/buffer_cache/buffer_cache.h', [
-    ('        if (buffer_bytes >= 1_GiB) {\n'
-     '            RunGarbageCollector(buffer_bytes >= 2_GiB);\n'
+    # (Lichii's own thresholds, 512 MiB and 1 GiB, are kept; the port adds the memory-pressure trigger.)
+    ('        if (buffer_bytes >= 512_MiB) {\n'
+     '            RunGarbageCollector(buffer_bytes >= 1_GiB);\n'
      '        }\n',
      '        const auto pressure = ::Eden::Performance::graphics_memory_probe.load(std::memory_order_relaxed);\n'
      '        const bool memory_short = frame_tick >= 60 && pressure && pressure();\n'
-     '        if (buffer_bytes >= 1_GiB || memory_short) {\n'
-     '            RunGarbageCollector(memory_short || buffer_bytes >= 2_GiB);\n'
+     '        if (buffer_bytes >= 512_MiB || memory_short) {\n'
+     '            RunGarbageCollector(memory_short || buffer_bytes >= 1_GiB);\n'
      '        }\n'),
     ('++frames % 600 == 0', '++frames % 60 == 0'),
     ('#include "video_core/buffer_cache/buffer_cache_base.h"',
@@ -1323,15 +1377,57 @@ probes = {
          '    Image& image, const StagingBufferRef& map,\n'
          '    std::span<const VideoCommon::SwizzleParameters> swizzles) {\n'
          '    ::Eden::Performance::Timer mkw_timer(::Eden::Performance::mkw_transcode);\n'),
-        # Decode images can otherwise survive a long loading burst until TickFrame. At this
-        # boundary every use of the input and output staging buffers has been recorded, so a
-        # wait is safe (unlike a wait inside an arbitrary staging-buffer allocation).
-        ('        .image = memory_allocator.CreateImage(VkImageCreateInfo{\n            .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,',
-         '        .image = memory_allocator.CreateTemporaryImage(VkImageCreateInfo{\n            .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,'),
+        # The ASTC decode image (made only when Lichii's free_transcodes pool has none of its
+        # shape): with EDEN_PS5_TRANSIENT_POOLS=1 (diagnostic builds) it comes from the PS5
+        # temporary-image pools (transient_images.inc); otherwise it keeps Lichii's dedicated
+        # allocation (CreateTemporaryImage's own fallback would not be dedicated).
+        ('            .image = memory_allocator.CreateImage(VkImageCreateInfo{\n'
+         '                .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,\n'
+         '                .pNext = nullptr,\n'
+         '                .flags = 0,\n'
+         '                .imageType = VK_IMAGE_TYPE_2D,\n'
+         '                .format = DecodeFormat,\n'
+         '                .extent = {width, height, 1},\n'
+         '                .mipLevels = levels,\n'
+         '                .arrayLayers = 1,\n'
+         '                .samples = VK_SAMPLE_COUNT_1_BIT,\n'
+         '                .tiling = VK_IMAGE_TILING_OPTIMAL,\n'
+         '                .usage = VK_IMAGE_USAGE_STORAGE_BIT,\n'
+         '                .sharingMode = VK_SHARING_MODE_EXCLUSIVE,\n'
+         '                .queueFamilyIndexCount = 0,\n'
+         '                .pQueueFamilyIndices = nullptr,\n'
+         '                .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,\n'
+         '            }, true),\n',
+         '            .image = [this](const VkImageCreateInfo& ci) {\n'
+         '                static const bool transient = [] {\n'
+         '                    const char* value = std::getenv("EDEN_PS5_TRANSIENT_POOLS");\n'
+         '                    return value != nullptr && value[0] == \'1\' && value[1] == \'\\0\';\n'
+         '                }();\n'
+         '                return transient ? memory_allocator.CreateTemporaryImage(ci)\n'
+         '                                 : memory_allocator.CreateImage(ci, true);\n'
+         '            }(VkImageCreateInfo{\n'
+         '                .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,\n'
+         '                .pNext = nullptr,\n'
+         '                .flags = 0,\n'
+         '                .imageType = VK_IMAGE_TYPE_2D,\n'
+         '                .format = DecodeFormat,\n'
+         '                .extent = {width, height, 1},\n'
+         '                .mipLevels = levels,\n'
+         '                .arrayLayers = 1,\n'
+         '                .samples = VK_SAMPLE_COUNT_1_BIT,\n'
+         '                .tiling = VK_IMAGE_TILING_OPTIMAL,\n'
+         '                .usage = VK_IMAGE_USAGE_STORAGE_BIT,\n'
+         '                .sharingMode = VK_SHARING_MODE_EXCLUSIVE,\n'
+         '                .queueFamilyIndexCount = 0,\n'
+         '                .pQueueFamilyIndices = nullptr,\n'
+         '                .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,\n'
+         '            }),\n'),
         # A full GPU wait per texture was 5% of the split's back thread at Mario Kart World's
         # title (one streamed texture a frame, the pool always short): the decode images are now
         # reclaimed once the ones in flight exceed EDEN_PS5_TRANSCODE_PENDING_MIB (64), waiting
         # for the oldest only. EDEN_PS5_TRANSCODE_FINISH=1 restores the wait after each.
+        # Reclaimed images go back to Lichii's reuse pool (free_transcodes) within the same
+        # 256 MiB bound TickFrame keeps (past it they are destroyed), as TickFrame would do.
         ('    pending_transcodes.push_back(std::move(pending));\n',
          '    pending_transcodes.push_back(std::move(pending));\n'
          '    const auto memory_short = ::Eden::Performance::graphics_memory_probe.load(std::memory_order_relaxed);\n'
@@ -1348,8 +1444,21 @@ probes = {
          '        if (finish_each) {\n'
          '            scheduler.Finish();\n'
          '        }\n'
-         '        while (!pending_transcodes.empty() && scheduler.IsFree(pending_transcodes.front().tick)) {\n'
+         '        u64 free_bytes = 0;\n'
+         '        for (const auto& entry : free_transcodes) {\n'
+         '            free_bytes += entry.bytes;\n'
+         '        }\n'
+         '        const auto reclaim_front = [&] {\n'
+         '            PendingTranscode& done = pending_transcodes.front();\n'
+         '            if (free_bytes + done.bytes <= (u64{256} << 20)) {\n'
+         '                done.unused_frames = 0;\n'
+         '                free_bytes += done.bytes;\n'
+         '                free_transcodes.push_back(std::move(done));\n'
+         '            }\n'
          '            pending_transcodes.pop_front();\n'
+         '        };\n'
+         '        while (!pending_transcodes.empty() && scheduler.IsFree(pending_transcodes.front().tick)) {\n'
+         '            reclaim_front();\n'
          '        }\n'
          '        u64 pending_bytes = 0;\n'
          '        for (const auto& entry : pending_transcodes) {\n'
@@ -1358,7 +1467,7 @@ probes = {
          '        while (pending_bytes > pending_limit && pending_transcodes.size() > 1) {\n'
          '            scheduler.Wait(pending_transcodes.front().tick);\n'
          '            pending_bytes -= pending_transcodes.front().bytes;\n'
-         '            pending_transcodes.pop_front();\n'
+         '            reclaim_front();\n'
          '        }\n'
          '        staging_buffer_pool.ReleaseCompleted();\n'
          '    }\n'),

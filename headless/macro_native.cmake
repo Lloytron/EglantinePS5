@@ -64,12 +64,13 @@ string(REPLACE "${front_begin}" [=[        ::Eden::MacroNative::Bench native_ben
                 [&](u32 address, u32 value) { ::Eden::MacroNative::EmitBench emit_bench{native_bench}; FrontWrite(split, fs, address, value, true, true); }, "front")) {
         engine.native_interpreter.active_dram = &native_data_ram;
 ]=] native_maxwell "${native_maxwell}")
-set(front_emit "            [&](u32 address, u32 value) {\n")
+# Lichii names the front write callback (const auto emit) and runs the JIT or the interpreter with it.
+set(front_emit "        const auto emit = [&](u32 address, u32 value) {\n")
 string(FIND "${native_maxwell}" "${front_emit}" front_emit_at)
 if(front_emit_at LESS 0)
     message(FATAL_ERROR "Pinned front macro method callback changed")
 endif()
-string(REPLACE "${front_emit}" "${front_emit}                ::Eden::MacroNative::EmitBench emit_bench{native_bench};\n"
+string(REPLACE "${front_emit}" "${front_emit}            ::Eden::MacroNative::EmitBench emit_bench{native_bench};\n"
     native_maxwell "${native_maxwell}")
 # Close just before the original scope's end, preserving its error handling.
 set(front_close "    }\n    fs.parameters.clear();")

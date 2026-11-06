@@ -163,11 +163,19 @@ string(REPLACE "    // \"from\" might no longer be valid if the thread was kille
 if(PS5_NATIVE)
 # Native fibers keep their 2MiB usable stack, but reserve it in the CPU flexible pool.
 # ThreadToFiber needs only context bookkeeping and allocates no unused private stack.
-string(REPLACE "    std::array<u8, DEFAULT_STACK_SIZE> stack{};"
+# Lichii's fiber keeps a heap std::unique_ptr<u8[]> stack, allocated in the entry-point
+# constructor and null for thread fibers (FiberStack::data() is null until Allocate).
+string(FIND "${fiber_source}" "    std::unique_ptr<u8[]> stack;" fiber_stack_at)
+string(FIND "${fiber_source}" "    impl->stack.reset(new u8[DEFAULT_STACK_SIZE]);" fiber_reset_at)
+if(fiber_stack_at LESS 0 OR fiber_reset_at LESS 0)
+    message(FATAL_ERROR "Pinned fiber.cpp changed: native fiber stack anchors not found")
+endif()
+string(REPLACE "    std::unique_ptr<u8[]> stack;"
     "    ::Eden::FiberStack stack;" fiber_source "${fiber_source}")
-string(REPLACE "    impl->stack_limit = impl->stack.data();"
-    "    impl->stack.Allocate(DEFAULT_STACK_SIZE);\n    impl->stack_limit = impl->stack.data();"
-    fiber_source "${fiber_source}")
+string(REPLACE "    impl->stack.reset(new u8[DEFAULT_STACK_SIZE]);"
+    "    impl->stack.Allocate(DEFAULT_STACK_SIZE);" fiber_source "${fiber_source}")
+string(REPLACE "&& impl->stack)" "&& impl->stack.data())" fiber_source "${fiber_source}")
+string(REPLACE "impl->stack.get()" "impl->stack.data()" fiber_source "${fiber_source}")
 string(PREPEND fiber_source "#include \"${EDEN_PORT_DIR}/fiber_stack.h\"\n")
 endif()
 write_derived("${PORT_BUILD_DIR}/fiber.cpp" "${fiber_source}")
@@ -858,14 +866,15 @@ endif()
 # Guest core idle: count each wait and how long it lasted, and spin on the
 # interrupt flag for a bounded time before sleeping on the condition variable, because waking a
 # sleeping host thread puts the host scheduler's latency on the guest's critical path.
-string(FIND "${physical_core_source}" "void PhysicalCore::Idle() {" idle_begin)
+string(FIND "${physical_core_source}" "void PhysicalCore::Idle(KernelCore& kernel) {" idle_begin)
 string(FIND "${physical_core_source}" "bool PhysicalCore::IsInterrupted() const {" idle_end)
 if(idle_begin LESS 0 OR idle_end LESS idle_begin)
     message(FATAL_ERROR "Pinned PhysicalCore::Idle changed")
 endif()
 math(EXPR idle_length "${idle_end} - ${idle_begin}")
 string(SUBSTRING "${physical_core_source}" ${idle_begin} ${idle_length} idle_old)
-string(REPLACE "${idle_old}" [=[void PhysicalCore::Idle() {
+# Lichii's Idle takes the kernel (for its Switch 2 default spin); the port's spin replaces that.
+string(REPLACE "${idle_old}" [=[void PhysicalCore::Idle([[maybe_unused]] KernelCore& kernel) {
     const long long start = ::Eden::Performance::NowNs();
     const unsigned spins = ::Eden::Performance::idle_spin_iterations.load(std::memory_order_relaxed);
     for (unsigned i = 0; i < spins && !m_is_interrupted.load(std::memory_order_acquire); ++i)
@@ -2017,8 +2026,13 @@ write_derived("${PORT_BUILD_DIR}/sink_details.cpp" "#include \"devices.h\"\n${si
 file(READ "${PROJECT_SOURCE_DIR}/src/audio_core/sink/sink_stream.cpp" stream_source)
 string(REPLACE "    if (type == StreamType::In)\n        return;"
     "    if (type == StreamType::In)\n        return;\n    static_assert(std::is_same_v<decltype(samples_buffer), Common::RingBuffer<s16, 0x10000>>);\n    if (buffer.frames * device_channels > 0x10000 - samples_buffer.Size())\n        throw std::overflow_error(\"Audio PCM queue capacity exceeded\");" stream_source "${stream_source}")
-string(REPLACE "        samples_buffer.Push(new_samples);"
-    "        if (system_channels == 1 && device_channels == 2) {\n            for (std::size_t i = 0; i < new_samples.size(); i += 2) new_samples[i + 1] = new_samples[i];\n        }\n        samples_buffer.Push(new_samples);" stream_source "${stream_source}")
+# Lichii keeps the pushed count (pushed = samples_buffer.Push(...)).
+string(FIND "${stream_source}" "        pushed = samples_buffer.Push(new_samples);" mono_push_at)
+if(mono_push_at LESS 0)
+    message(FATAL_ERROR "Pinned sink_stream.cpp changed: upmix push not found")
+endif()
+string(REPLACE "        pushed = samples_buffer.Push(new_samples);"
+    "        if (system_channels == 1 && device_channels == 2) {\n            for (std::size_t i = 0; i < new_samples.size(); i += 2) new_samples[i + 1] = new_samples[i];\n        }\n        pushed = samples_buffer.Push(new_samples);" stream_source "${stream_source}")
 # Refresh the held frame before a partial hardware block underruns.
 string(REPLACE "    std::memcpy(last_frame.data(), &output_buffer[(frames_written - 1) * frame_size], frame_size_bytes);" "" stream_source "${stream_source}")
 string(REPLACE "        samples_buffer.Pop(&output_buffer[frames_written * frame_size], frames_available * frame_size);"
@@ -2364,7 +2378,8 @@ if(EDEN_DEV_PROFILE)
     # render conditions apart from the game's own LOD choices (LOD swaps).
     file(READ "${PROJECT_SOURCE_DIR}/src/video_core/engines/maxwell_3d.cpp" maxwell_source)
     set(condition_accelerated "    if (rasterizer->AccelerateConditionalRendering()) {\n        execute_on = true;\n        return;\n    }")
-    set(condition_end "    }\n    }\n}\n\nvoid Maxwell3D::ProcessCounterReset() {")
+    # Lichii logs the evaluation (QueryTrace CpuCondition) after the switch; count before that.
+    set(condition_end "    }\n    }\n    if (const u64 trace =\n            VideoCommon::QueryTrace::Sample(VideoCommon::QueryTrace::Event::CpuCondition)) {")
     foreach(anchor IN ITEMS condition_accelerated condition_end)
         string(FIND "${maxwell_source}" "${${anchor}}" anchor_at)
         if(anchor_at LESS 0)
@@ -2375,7 +2390,7 @@ if(EDEN_DEV_PROFILE)
         "    if (rasterizer->AccelerateConditionalRendering()) {\n        execute_on = true;\n        ::Eden::Performance::CountCondition(0);\n        return;\n    }"
         maxwell_source "${maxwell_source}")
     string(REPLACE "${condition_end}"
-        "    }\n    }\n    ::Eden::Performance::CountCondition(\n        regs.render_enable_override == Regs::RenderEnable::Override::AlwaysRender ? 1u :\n        regs.render_enable_override == Regs::RenderEnable::Override::NeverRender ? 2u :\n        3u + static_cast<unsigned>(regs.render_enable.mode) * 2u + (execute_on ? 1u : 0u));\n}\n\nvoid Maxwell3D::ProcessCounterReset() {"
+        "    }\n    }\n    ::Eden::Performance::CountCondition(\n        regs.render_enable_override == Regs::RenderEnable::Override::AlwaysRender ? 1u :\n        regs.render_enable_override == Regs::RenderEnable::Override::NeverRender ? 2u :\n        3u + static_cast<unsigned>(regs.render_enable.mode) * 2u + (execute_on ? 1u : 0u));\n    if (const u64 trace =\n            VideoCommon::QueryTrace::Sample(VideoCommon::QueryTrace::Event::CpuCondition)) {"
         maxwell_source "${maxwell_source}")
     write_derived("${PORT_BUILD_DIR}/maxwell_3d.cpp" "#include \"${EDEN_PORT_DIR}/performance.h\"\n${maxwell_source}")
     list(REMOVE_ITEM video_sources engines/maxwell_3d.cpp)
@@ -2433,7 +2448,7 @@ ${paths_source}")
     string(REPLACE "${old_tsc_fallback}" "        }" features_source "${features_source}")
     # Eglantine measures the TSC of CPUs without leaf 0x15 itself, for frequency 0 only; the block
     # below covers every frequency under 1 GHz, so that one goes (tools/check-tsc-fallback.py).
-    string(REPLACE "    // AMD CPUs have no leaf 0x15 (Zen 4 stops at 0x10): measure their invariant TSC too, or every\n    // guest clock read (CNTPCT, which games read thousands of times a frame) goes through the\n    // host's much slower QueryPerformanceCounter.\n    if (caps.invariant_tsc && caps.tsc_frequency == 0) {\n        caps.tsc_frequency = X64::EstimateRDTSCFrequency();\n    }\n\n" "" features_source "${features_source}")
+    string(REPLACE "    // AMD CPUs have no leaf 0x15 (Zen 4 stops at 0x10): measure their invariant TSC too, or every\n    // guest clock read (CNTPCT, which games read thousands of times a frame) goes through the\n    // host's much slower QueryPerformanceCounter. Intel CPUs that have the leaf but report no\n    // crystal frequency (e.g. Coffee Lake) keep the OS clock: an i5-9400F crashed at launch on the\n    // measured RDTSC clock.\n    if (max_std_fn < 0x15 && caps.invariant_tsc && caps.tsc_frequency == 0) {\n        caps.tsc_frequency = X64::EstimateRDTSCFrequency();\n    }\n\n" "" features_source "${features_source}")
     string(REPLACE "    if (max_std_fn >= 0x16) {"
         "    if (caps.invariant_tsc && caps.tsc_frequency < 1'000'000'000ULL) {\n        caps.tsc_frequency = X64::EstimateRDTSCFrequency();\n    }\n\n    if (max_std_fn >= 0x16) {" features_source "${features_source}")
     write_derived("${PORT_BUILD_DIR}/cpu_features.cpp" "${features_source}")
