@@ -1193,10 +1193,10 @@ configure_phases = [
      '    // Descriptor queue acquired, image descriptors pushed, uploads barriered.\n'
      '    ::Eden::Performance::Mark(::Eden::Performance::cfg_desc, since);\n'
      '    texture_cache.UpdateRenderTargets(false);'),
-    ('    if (IsBuilt() && !pipeline) {',
+    ('    if (IsBuilt() && (!pipeline || build->Failed())) {',
      '    // Render targets current, feedback loops checked.\n'
      '    ::Eden::Performance::Mark(::Eden::Performance::cfg_rt, since);\n'
-     '    if (IsBuilt() && !pipeline) {'),
+     '    if (IsBuilt() && (!pipeline || build->Failed())) {'),
     ('    return ConfigureDraw(rescaling, render_area);',
      '    // Compare the descriptor payload against last draw\'s and record the bindings.\n'
      '    const bool configured = ConfigureDraw(rescaling, render_area);\n'
