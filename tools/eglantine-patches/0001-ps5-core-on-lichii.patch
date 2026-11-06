@@ -862,7 +862,7 @@ index 8e111d4f..9f4a10e5 100644
                  if (gpu_address >= mapping.gpu_address &&
                      gpu_address - mapping.gpu_address < mapping.size) {
 diff --git a/src/core/hle/service/nx2_gsv.h b/src/core/hle/service/nx2_gsv.h
-index a80387be..cd3c6167 100644
+index a80387be..8bc11743 100644
 --- a/src/core/hle/service/nx2_gsv.h
 +++ b/src/core/hle/service/nx2_gsv.h
 @@ -1,3 +1,4 @@
@@ -1147,6 +1147,15 @@ index a80387be..cd3c6167 100644
  
      // The console flips one frame per 60 Hz vblank and keeps the rest queued, so a game can't
      // present faster than that. Every slot is reported free here: hold each present until the
+@@ -2449,7 +2524,7 @@ private:
+                         vsync_state->trace_late_callbacks +=
+                             VblankInterval.count() > 0 && late >= VblankInterval;
+                         vsync_state->trace_max_late =
+-                            (std::max)(vsync_state->trace_max_late, late.count());
++                            (std::max<s64>)(vsync_state->trace_max_late, late.count());
+                         if (vsync_state->trace_last_callback) {
+                             const s64 gap = observed - *vsync_state->trace_last_callback;
+                             vsync_state->trace_min_gap = vsync_state->trace_min_gap
 @@ -3529,6 +3604,9 @@ private:
              m_syncpt_rw = GetInteger(rw->GetSourceAddress());
              m_syncpt_ro = GetInteger(ro->GetSourceAddress());
