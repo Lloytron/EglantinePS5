@@ -1310,7 +1310,20 @@ for old, new in shader_costs:
         old = old.replace('    return BuiltPipeline', mark_used + '    return BuiltPipeline')
         new = new.replace('    current_pipeline = pipeline.get();\n',
                           '    current_pipeline = pipeline.get();\n' + mark_used)
-    if 'Shader::TensorRejected' in old and 'Shader::TensorRejected' not in shader_source:
+    lichii_compute = ('    if (is_new) {\n        entry = CreateComputePipeline(key, shader);\n    }\n'
+                      '    return entry.Get(kepler_compute->IsNativeMode(),\n'
+                      '                     kepler_compute->regs.code_loc.Address() + qmd.program_start, key);\n}')
+    if 'Shader::TensorRejected' in old and lichii_compute in shader_source:
+        # Lichii: the compute cache holds a ComputePipelineCacheEntry resolved per launch, and
+        # tensor programs are no longer rejected by exception. Keep only the first-use trace.
+        trace = new[new.index('    if (::Eden::DevVulkan::trace_pipelines && pipeline)'):]
+        trace = trace.replace('    return pipeline.get();\n}', '    return pipeline;\n}')
+        old = lichii_compute
+        new = ('    if (is_new) {\n        entry = CreateComputePipeline(key, shader);\n    }\n'
+               '    ComputePipeline* const pipeline{entry.Get(kepler_compute->IsNativeMode(),\n'
+               '        kepler_compute->regs.code_loc.Address() + qmd.program_start, key)};\n'
+               + trace.replace('pipeline.get()', 'pipeline'))
+    elif 'Shader::TensorRejected' in old and 'Shader::TensorRejected' not in shader_source:
         old = ('    if (!is_new) {\n        return pipeline.get();\n    }\n'
                '    pipeline = CreateComputePipeline(key, shader);\n    return pipeline.get();\n}')
         trace = new[new.index('    if (::Eden::DevVulkan::trace_pipelines && pipeline)'):]
