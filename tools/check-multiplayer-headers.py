@@ -14,6 +14,11 @@ active = {line.split(': ', 1)[0] for line in ninja('targets', 'all').splitlines(
 headers = ('network/packet.h', 'network/room_member.h',
            'core/internal_network/sockets.h', 'core/internal_network/socket_proxy.h',
            'core/hle/service/sockets/bsd.h')
+# With EDEN_PS5_PROXY_SOCKETS off (multiplayer_packets.cmake), socket_proxy and bsd are Lichii's own.
+cache = build / 'CMakeCache.txt'
+if cache.exists() and 'EDEN_PS5_PROXY_SOCKETS:BOOL=ON' not in cache.read_text():
+    headers = tuple(h for h in headers if h not in ('core/internal_network/socket_proxy.h',
+                                                    'core/hle/service/sockets/bsd.h'))
 seen = dict.fromkeys(headers, 0)
 wrong, target = [], None
 for line in ninja('deps').splitlines():
