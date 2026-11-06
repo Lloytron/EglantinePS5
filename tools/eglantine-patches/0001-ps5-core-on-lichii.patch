@@ -1571,31 +1571,6 @@ index b47f1288..abe286e8 100644
      frontend/maxwell/translate/translate.cpp
      frontend/maxwell/translate/translate.h
      frontend/maxwell/translate_program.cpp
-diff --git a/src/shader_recompiler/backend/glasm/emit_glasm_not_implemented.cpp b/src/shader_recompiler/backend/glasm/emit_glasm_not_implemented.cpp
-index eff07ffe..187d65fb 100644
---- a/src/shader_recompiler/backend/glasm/emit_glasm_not_implemented.cpp
-+++ b/src/shader_recompiler/backend/glasm/emit_glasm_not_implemented.cpp
-@@ -118,4 +118,20 @@ void EmitTensorMulAdd(EmitContext& ctx, IR::Inst& inst, const IR::Value& a,
-     NotImplemented();
- }
- 
-+void EmitIsbeRead(EmitContext& ctx) {
-+    NotImplemented();
-+}
-+
-+void EmitIsbeWriteAttribute(EmitContext& ctx) {
-+    NotImplemented();
-+}
-+
-+void EmitIsbeWriteMapU8(EmitContext& ctx) {
-+    NotImplemented();
-+}
-+
-+void EmitIsbeWriteMapU32(EmitContext& ctx) {
-+    NotImplemented();
-+}
-+
- } // namespace Shader::Backend::GLASM
 diff --git a/src/shader_recompiler/backend/glsl/emit_glsl_integer.cpp b/src/shader_recompiler/backend/glsl/emit_glsl_integer.cpp
 index c3f0e504..8d7a76b0 100644
 --- a/src/shader_recompiler/backend/glsl/emit_glsl_integer.cpp
@@ -1609,31 +1584,6 @@ index c3f0e504..8d7a76b0 100644
          ctx.AddU1("{}=int({})>=0?{}:{};", *overflow, a, positive_result, negative_result);
          overflow->Invalidate();
      }
-diff --git a/src/shader_recompiler/backend/glsl/emit_glsl_not_implemented.cpp b/src/shader_recompiler/backend/glsl/emit_glsl_not_implemented.cpp
-index a6b09272..cbe64e99 100644
---- a/src/shader_recompiler/backend/glsl/emit_glsl_not_implemented.cpp
-+++ b/src/shader_recompiler/backend/glsl/emit_glsl_not_implemented.cpp
-@@ -118,4 +118,20 @@ void EmitTensorMulAdd(EmitContext& ctx, IR::Inst& inst, const IR::Value& a,
-     NotImplemented();
- }
- 
-+void EmitIsbeRead(EmitContext& ctx) {
-+    NotImplemented();
-+}
-+
-+void EmitIsbeWriteAttribute(EmitContext& ctx) {
-+    NotImplemented();
-+}
-+
-+void EmitIsbeWriteMapU8(EmitContext& ctx) {
-+    NotImplemented();
-+}
-+
-+void EmitIsbeWriteMapU32(EmitContext& ctx) {
-+    NotImplemented();
-+}
-+
- } // namespace Shader::Backend::GLSL
 diff --git a/src/shader_recompiler/backend/spirv/emit_spirv_integer.cpp b/src/shader_recompiler/backend/spirv/emit_spirv_integer.cpp
 index 7c9a233f..44a1a419 100644
 --- a/src/shader_recompiler/backend/spirv/emit_spirv_integer.cpp

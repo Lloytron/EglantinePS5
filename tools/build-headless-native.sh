@@ -74,7 +74,10 @@ python3 -B "$root/headless/check_slab_lifetime.py" \
     "$scratch/native-local/headless/include/core/hle/kernel/slab_helpers.h" \
     "$scratch/source/src/core/hle/kernel/slab_helpers.h"
 echo "Building Eden with $jobs parallel jobs"
-cmake --build "$scratch/native-local" --target eden-headless core -j "$jobs"
+# On CI, keep compiling past a failed file so one run reports every compile error.
+keep_going=()
+[[ ${CI:-} == true ]] && keep_going=(-- -k 0)
+cmake --build "$scratch/native-local" --target eden-headless core -j "$jobs" "${keep_going[@]}"
 # In every build: an object that saw Eden's own table header would write a table the rest keeps sparse.
 python3 -B "$root/tools/check-sparse-header.py" "$scratch/native-local"
 python3 -B "$root/tools/check-macro-headers.py" "$scratch/native-local"
