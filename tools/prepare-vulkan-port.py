@@ -1206,9 +1206,12 @@ configure_phases = [
 for name in ('vk_graphics_pipeline', 'vk_compute_pipeline'):
     anchors = [
         ('#include <algorithm>', '#include <algorithm>\n#include "performance.h"'),
-        ('            std::unique_lock lock{build_mutex};',
-         '            auto timer = Eden::Performance::VulkanTimer(16);\n            std::unique_lock lock{build_mutex};'),
     ]
+    # Lichii moved the graphics pipeline's build wait into PipelineBuild (pipeline_build.h);
+    # only the compute pipeline still waits on its own build_mutex.
+    if '            std::unique_lock lock{build_mutex};' in (source / f'src/video_core/renderer_vulkan/{name}.cpp').read_text():
+        anchors.append(('            std::unique_lock lock{build_mutex};',
+                        '            auto timer = Eden::Performance::VulkanTimer(16);\n            std::unique_lock lock{build_mutex};'))
     if name == 'vk_graphics_pipeline':
         anchors += configure_phases
     adapt(f'src/video_core/renderer_vulkan/{name}.cpp', name + '_cost.cpp', anchors)
