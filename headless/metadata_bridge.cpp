@@ -42,6 +42,8 @@
 #include "core/file_sys/content_archive.h"
 #include "core/file_sys/control_metadata.h"
 #include "core/file_sys/nca_metadata.h"
+#include "core/file_sys/nup_container.h"
+#include "core/file_sys/vfs/vfs_vector.h"
 #include "core/file_sys/registered_cache.h"
 #include "core/file_sys/romfs.h"
 #include "core/file_sys/submission_package.h"
@@ -210,6 +212,12 @@ uint64_t eden_game_title_id(const char* rom_path) {
         FileSys::NSP package(file);
         return package.GetStatus() == Loader::ResultStatus::Success ? package.GetProgramTitleID() : 0;
     }
+    if (path.ends_with(".nup")) {
+        FileSys::NupContainer nup(file);
+        if (nup.GetStatus() != Loader::ResultStatus::Success) return 0;
+        const auto base = nup.FindBasePackage();
+        return base ? nup.GetPackages()[*base].title_id : 0;
+    }
     return 0;
 }
 
@@ -225,6 +233,29 @@ int eden_extract_game_metadata(const char* rom_path, const char* keys_dir,
     std::string path = rom_path;
     std::transform(path.begin(), path.end(), path.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (path.ends_with(".nup")) {
+        // Lichii's NUP package keeps the title and icon in its own metadata, not in a control NCA.
+        FileSys::NupContainer nup(file);
+        if (nup.GetStatus() != Loader::ResultStatus::Success) return 0;
+        auto package = nup.FindBasePackage();
+        if (!package) package = nup.FindBestUpdatePackage();
+        if (!package) return 0;
+        const auto& info = nup.GetPackages()[*package];
+        int nup_result = 0;
+        std::string name = info.title_name;
+        for (const auto& [language, localized] : info.localized_titles)
+            if (name.empty() && !localized.empty()) name = localized;
+        if (!name.empty()) {
+            std::snprintf(title, title_capacity, "%s", name.c_str());
+            nup_result |= EDEN_METADATA_TITLE;
+        }
+        std::vector<u8> icon = info.icon;
+        if (icon.empty() && !info.localized_icons.empty()) icon = info.localized_icons.front().second;
+        if (!icon.empty() &&
+            WriteTga(std::make_shared<FileSys::VectorVfsFile>(std::move(icon), "icon.dat"), cover_tga_path))
+            nup_result |= EDEN_METADATA_COVER;
+        return nup_result;
+    }
     const bool xci = path.size() >= 4 && path.substr(path.size() - 4) == ".xci";
     const auto romfs = OpenControlRomFs(file, xci);
     if (!romfs) return 0;
@@ -252,6 +283,7 @@ uint32_t eden_game_supported_languages(const char* rom_path, const char* keys_di
         std::string path = rom_path;
         std::transform(path.begin(), path.end(), path.begin(),
                        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (path.ends_with(".nup")) return 0;  // NUP metadata has no NACP language mask
         const auto romfs = OpenControlRomFs(file, path.ends_with(".xci"));
         if (!romfs) return 0;
         return GameLanguages()[rom_path] = ReadLanguages(romfs);
