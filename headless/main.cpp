@@ -1172,18 +1172,10 @@ int main(int argc, char** argv) {
             // Mods): Eden's patch manager skips the names in this list. With the Library's Mods
             // switch off for the game, every one of them is in it.
             const u64 title = eden_game_title_id(guest);
-            {
-                // Donkey Kong Bananza's update needs its HMMA compute shaders expanded in software
-                // (patch 0009); other titles keep skipping them, as Mario Kart World's frame rate
-                // was measured. In the Lichii core an unset EDEN_NX2_SOFT_HMMA lowers HMMA and only
-                // =0 skips the programs, so the port sets 0 for every other title. A value from
-                // env.txt wins.
-                static bool soft_hmma_by_port = false;
-                if (soft_hmma_by_port || std::getenv("EDEN_NX2_SOFT_HMMA") == nullptr) {
-                    setenv("EDEN_NX2_SOFT_HMMA", title == 0x040074A01BF12000ULL ? "1" : "0", 1);
-                    soft_hmma_by_port = true;
-                }
-            }
+            // HMMA compute programs are lowered for every title, as in Lichii ("nx2: emulate HMMA by
+            // default"): Switch 2 games run their upscaler on them, and skipping them leaves the 3D
+            // picture unwritten (The Legend of Zelda: Ocarina of Time showed only its interface).
+            // EDEN_NX2_SOFT_HMMA=0 in env.txt still skips them.
             const auto all_mods = Eden::Mods::List(Eden::AssetsPath("mods"), title);
             auto mods_off = Eden::LoadDisabledMods(title);
             if (!Eden::LoadModsEnabled(title)) {
