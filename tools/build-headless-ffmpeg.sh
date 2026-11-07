@@ -46,12 +46,13 @@ meson setup "$scratch/dav1d-build" "$scratch/dav1d-src" --cross-file "$scratch/d
     -Denable_tools=false -Denable_examples=false -Denable_tests=false -Dlogging=false
 meson compile -C "$scratch/dav1d-build" -j "${EDEN_BUILD_JOBS:-$(nproc)}"
 meson install -C "$scratch/dav1d-build"
-test -f "$prefix/lib/libdav1d.a" && test -f "$prefix/lib/pkgconfig/dav1d.pc"
+# Meson follows FreeBSD here and puts dav1d.pc in libdata/pkgconfig.
+test -f "$prefix/lib/libdav1d.a" && test -f "$prefix/libdata/pkgconfig/dav1d.pc"
 
 cd "$scratch/ffmpeg-native"
 # Use the same pinned, minimal decoder set as the Linux core, plus libdav1d for AV1. Avoid the full
 # prebuilt FFmpeg package's unrelated codec and C++ runtime dependencies.
-PKG_CONFIG_LIBDIR="$prefix/lib/pkgconfig" PKG_CONFIG_PATH= \
+PKG_CONFIG_LIBDIR="$prefix/libdata/pkgconfig:$prefix/lib/pkgconfig" PKG_CONFIG_PATH= \
 bash "$source/configure" --prefix="$prefix" \
     --enable-cross-compile --arch=x86_64 --target-os=freebsd \
     --cc="bash $root/tools/ffmpeg-ps5-cc.sh" --ld="bash $root/tools/ffmpeg-ps5-cc.sh" \
