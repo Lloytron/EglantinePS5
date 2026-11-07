@@ -3903,20 +3903,40 @@ index 04a12fd3..016405ba 100644
  
      enum class MemoryLayout : u32 {
 diff --git a/src/video_core/engines/kepler_compute.cpp b/src/video_core/engines/kepler_compute.cpp
-index ff708ca2..3a0beb56 100644
+index ff708ca2..d581a253 100644
 --- a/src/video_core/engines/kepler_compute.cpp
 +++ b/src/video_core/engines/kepler_compute.cpp
-@@ -600,7 +600,8 @@ bool KeplerCompute::DispatchNativeCompute(const NativeQmdScheduler::Descriptor&
-         } else if (std::string_view{error.what()}.find("matrix multiply") !=
-                    std::string_view::npos) {
-             DescribeNativeResources(qmd);
+@@ -595,12 +595,25 @@ bool KeplerCompute::DispatchNativeCompute(const NativeQmdScheduler::Descriptor&
+             LOG_ERROR(HW_GPU, "Native compute shader rejected: {}", error.what());
+         }
+         dispatched = false;
++        // PS5 port: since Lichii #197 a program's later dispatches skip the cached rejection and
++        // fail as "Native compute pipeline unavailable", without the matrix multiply reason, so
++        // the stand-in ran for the first dispatch only (Ocarina's title movie stayed on its
++        // first, black, frame). Remember the tensor programs and stand in on every dispatch.
++        static std::unordered_set<GPUVAddr> tensor_programs;
++        const GPUVAddr program_key = regs.code_loc.Address() + launch_description.program_start;
++        const bool matrix =
++            std::string_view{error.what()}.find("matrix multiply") != std::string_view::npos;
++        if (matrix) {
++            tensor_programs.insert(program_key);
++        }
+         if (dlss_chain.active) {
+             ++dlss_chain.rejected;
+-        } else if (std::string_view{error.what()}.find("matrix multiply") !=
+-                   std::string_view::npos) {
+-            DescribeNativeResources(qmd);
 -            LOG_ERROR(HW_GPU, "Native tensor dispatch is unsupported; no validated replacement was available");
++        } else if (matrix || tensor_programs.contains(program_key)) {
++            if (matrix) {
++                DescribeNativeResources(qmd);
++            }
 +            // The console runs this on tensor cores; stand in with a plain upscale of its input.
 +            return UpscaleInsteadOfNativeProgram();
          }
      }
      if (dlss_chain.output_pass) {
-@@ -864,6 +865,353 @@ bool KeplerCompute::FinishDlssEvaluation() {
+@@ -864,6 +877,353 @@ bool KeplerCompute::FinishDlssEvaluation() {
      return TryFireEmblemUpscale();
  }
  
