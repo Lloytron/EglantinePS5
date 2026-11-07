@@ -48,6 +48,11 @@ enum class ThreadPriority { Critical };
 void SetCurrentThreadName(const char*) {}
 void SetCurrentThreadPriority(ThreadPriority) {}
 void SetCurrentThreadToPerformanceCores() {}
+// Lichii's per-thread CPU trace (common/dkb_cpu_trace.h): the worker registers itself.
+namespace DkbCpuTrace {
+enum class Role { VulkanWorker };
+struct Registration { explicit Registration(Role) {} };
+}
 }
 struct Event : std::condition_variable_any {
     unsigned notifications{};

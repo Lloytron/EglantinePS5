@@ -72,6 +72,7 @@ struct Manager {
  bool SkipEmptyFence(){return skip;}
  TFence CreateFence(bool stubbed){return std::make_shared<TestFence>(TestFence{stubbed});}
  void QueueFence(const TFence&){++queued;}
+ void SubmitDeferredWork(){}  // Lichii: the base FenceManager's default is a no-op
  struct CacheFlushes{bool should_flush;u8 committed;u8 required;};
 '''
 code += body(source, 'CacheFlushes CommitCacheFlushes()') + '\n'
