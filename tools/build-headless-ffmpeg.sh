@@ -75,5 +75,7 @@ save
 end
 MRI
 mv "$prefix/lib/libavcodec.merged.a" "$prefix/lib/libavcodec.a"
-llvm-nm-18 "$prefix/lib/libavcodec.a" 2>/dev/null | grep -q ' T dav1d_send_data$' ||
-    { echo 'libdav1d was not merged into libavcodec' >&2; exit 1; }
+# Listed to a file first: grep -q would cut llvm-nm off and pipefail would count that as a failure.
+llvm-nm-18 --defined-only "$prefix/lib/libavcodec.a" > "$scratch/ffmpeg-native/avcodec-symbols.txt" 2>/dev/null || true
+grep -qE ' [TtDd] _?dav1d_send_data$' "$scratch/ffmpeg-native/avcodec-symbols.txt" ||
+    { echo 'libdav1d was not merged into libavcodec' >&2; llvm-ar-18 t "$prefix/lib/libavcodec.a" | tail -5 >&2; exit 1; }
