@@ -1511,7 +1511,7 @@ probes = {
     ],
 }
 for name, index, expected in (
-    ('vk_fence_manager', 6, 1), ('vk_buffer_cache', 7, 8),  # three diagnostic mapped-readback probe waits; Lichii added WaitSubmitted's fallback and the host-read finish
+    ('vk_fence_manager', 6, 1), ('vk_buffer_cache', 7, 7),  # three diagnostic mapped-readback probe waits; Lichii added WaitSubmitted's fallback and the host-read finish, then dropped the quad index buffer's Finish (#414)
     ('vk_texture_cache', 8, 1), ('vk_swapchain', 9, 6),
     ('vk_descriptor_buffer', 10, 2), ('vk_multi_range_buffer', 11, 1),
     ('vk_compute_pass', 12, 1),
