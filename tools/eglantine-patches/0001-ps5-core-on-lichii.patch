@@ -1,8 +1,8 @@
 diff --git a/src/common/CMakeLists.txt b/src/common/CMakeLists.txt
-index 56709cf4..eb906d54 100644
+index c3c8fe00..9744525b 100644
 --- a/src/common/CMakeLists.txt
 +++ b/src/common/CMakeLists.txt
-@@ -73,6 +73,7 @@ add_library(
+@@ -75,6 +75,7 @@ add_library(
      hex_util.cpp
      hex_util.h
      host_memory.cpp
@@ -287,10 +287,10 @@ index b489e795..ced153e6 100644
      return TranslateHaltReason(m_jit->Step());
  }
 diff --git a/src/core/core.cpp b/src/core/core.cpp
-index 7b33e18f..700101aa 100644
+index 951d99cc..6917c655 100644
 --- a/src/core/core.cpp
 +++ b/src/core/core.cpp
-@@ -377,11 +377,24 @@ struct System::Impl {
+@@ -394,11 +394,24 @@ struct System::Impl {
  
          // Switch 2 titles size their heap from the total memory and need the 12 GiB layout. Set it
          // as a per-game value, so RestoreGlobalState brings back the configured layout afterwards.
@@ -320,10 +320,10 @@ index 7b33e18f..700101aa 100644
  
          // The Switch 2 counter runs at 31.25 MHz and its SDK converts ticks with that constant
 diff --git a/src/core/device_memory_manager.h b/src/core/device_memory_manager.h
-index 74985c31..320999a0 100644
+index 12cd0e60..be601be9 100644
 --- a/src/core/device_memory_manager.h
 +++ b/src/core/device_memory_manager.h
-@@ -138,6 +138,9 @@ public:
+@@ -141,6 +141,9 @@ public:
  
      /// Traps the next guest CPU read of these pages, to learn which GPU writes the CPU reads.
      void ArmReadTraps(DAddr addr, size_t size);
@@ -334,7 +334,7 @@ index 74985c31..320999a0 100644
  private:
      struct TranslationEntry {
 diff --git a/src/core/device_memory_manager.inc b/src/core/device_memory_manager.inc
-index ca5e1e36..ed76bd41 100644
+index 40ff9ef5..31049613 100644
 --- a/src/core/device_memory_manager.inc
 +++ b/src/core/device_memory_manager.inc
 @@ -1,3 +1,4 @@
@@ -342,7 +342,7 @@ index ca5e1e36..ed76bd41 100644
  // SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
  // SPDX-License-Identifier: GPL-3.0-or-later
  
-@@ -254,12 +255,16 @@ void DeviceMemoryManager<Traits>::Map(DAddr address, VAddr virtual_address, size
+@@ -280,12 +281,16 @@ void DeviceMemoryManager<Traits>::Map(DAddr address, VAddr virtual_address, size
      Core::Memory::Memory* process_memory = registered_processes[asid.id];
      size_t start_page_d = address >> Memory::YUZU_PAGEBITS;
      size_t num_pages = Common::AlignUp(size, Memory::YUZU_PAGESIZE) >> Memory::YUZU_PAGEBITS;
@@ -359,7 +359,7 @@ index ca5e1e36..ed76bd41 100644
          auto* ptr = process_memory->GetPointerSilent(Common::ProcessAddress(new_vaddress));
          // One page per run unless tracked below: a run left from an earlier mapping of these
          // device pages would make WalkBlock copy the host memory that followed that mapping.
-@@ -270,7 +275,9 @@ void DeviceMemoryManager<Traits>::Map(DAddr address, VAddr virtual_address, size
+@@ -296,7 +301,9 @@ void DeviceMemoryManager<Traits>::Map(DAddr address, VAddr virtual_address, size
          }
          auto phys_addr = static_cast<u32>(GetRawPhysicalAddr(ptr) >> Memory::YUZU_PAGEBITS) + 1U;
          tracked_entries.GetUnchecked(start_page_d + i).compressed_physical_ptr = phys_addr;
@@ -369,7 +369,7 @@ index ca5e1e36..ed76bd41 100644
          const u32 base_dev = compressed_device_addr[phys_addr - 1U];
          const u32 new_dev = static_cast<u32>(start_page_d + i);
          if (base_dev == 0) [[likely]] {
-@@ -282,10 +289,14 @@ void DeviceMemoryManager<Traits>::Map(DAddr address, VAddr virtual_address, size
+@@ -308,10 +315,14 @@ void DeviceMemoryManager<Traits>::Map(DAddr address, VAddr virtual_address, size
              start_id = impl->multi_dev_address.Register(base_dev);
              compressed_device_addr.GetAndFault(phys_addr - 1U) = MULTI_FLAG | start_id;
          }
@@ -549,7 +549,7 @@ index 8bc0271b..cefa70f6 100644
  #include "audio_core/out/audio_out.h"
  #include "core/hle/service/cmif_types.h"
 diff --git a/src/core/hle/service/nvdrv/devices/nvhost_as_gpu.cpp b/src/core/hle/service/nvdrv/devices/nvhost_as_gpu.cpp
-index b6aa71dd..a16bd660 100644
+index 36427c2f..c51e3069 100644
 --- a/src/core/hle/service/nvdrv/devices/nvhost_as_gpu.cpp
 +++ b/src/core/hle/service/nvdrv/devices/nvhost_as_gpu.cpp
 @@ -1,3 +1,4 @@
@@ -862,7 +862,7 @@ index 8e111d4f..9f4a10e5 100644
                  if (gpu_address >= mapping.gpu_address &&
                      gpu_address - mapping.gpu_address < mapping.size) {
 diff --git a/src/core/hle/service/nx2_gsv.h b/src/core/hle/service/nx2_gsv.h
-index a80387be..8bc11743 100644
+index c680a2cd..d605b380 100644
 --- a/src/core/hle/service/nx2_gsv.h
 +++ b/src/core/hle/service/nx2_gsv.h
 @@ -1,3 +1,4 @@
@@ -1104,7 +1104,7 @@ index a80387be..8bc11743 100644
              m_region_cv.wait(lk, [&] {
                  bool pending = false;
                  for_regions([&](u64, SparseRegion& region, u64 first, u64 last) {
-@@ -1751,9 +1810,15 @@ private:
+@@ -1758,9 +1817,15 @@ private:
          // previous frame's fence instead and let the game prepare frame N+1 meanwhile (waiting
          // for this frame there cost 8-56 ms of every 34-105 ms frame, or never finished).
          // EDEN_NX2_FRAMES_AHEAD=1 always waits for the previous frame, =0 always for this one.
@@ -1121,7 +1121,7 @@ index a80387be..8bc11743 100644
          }();
          // Donkey Kong Bananza's channels wait on each other every frame, so it always ran a frame
          // ahead, where it rewrote memory the GPU thread hadn't read yet (misread commands, then
-@@ -1769,7 +1834,16 @@ private:
+@@ -1776,7 +1841,16 @@ private:
              frames_ahead = 1;
          }
          const auto entered = std::chrono::steady_clock::now();
@@ -1139,7 +1139,7 @@ index a80387be..8bc11743 100644
              LOG_DEBUG(Service, "nx2:vi2 present #{} fence ({}, {:#x}), waiting for ({}, {:#x}); now {:#x}",
                        m_presents, ~w[22], w[24], m_previous_fence_id, m_previous_fence_value,
                        ~w[22] < 192 ? system.Host1x().GetSyncpointManager().GetGuestSyncpointValue(~w[22]) : 0U);
-@@ -1878,6 +1952,7 @@ private:
+@@ -1885,6 +1959,7 @@ private:
      } m_stats{};
      u32 m_previous_fence_id{~0U}; // none yet (WaitForFrame ignores ids >= 192)
      u32 m_previous_fence_value{};
@@ -1147,7 +1147,7 @@ index a80387be..8bc11743 100644
  
      // The console flips one frame per 60 Hz vblank and keeps the rest queued, so a game can't
      // present faster than that. Every slot is reported free here: hold each present until the
-@@ -2449,7 +2524,7 @@ private:
+@@ -2456,7 +2531,7 @@ private:
                          vsync_state->trace_late_callbacks +=
                              VblankInterval.count() > 0 && late >= VblankInterval;
                          vsync_state->trace_max_late =
@@ -1156,7 +1156,7 @@ index a80387be..8bc11743 100644
                          if (vsync_state->trace_last_callback) {
                              const s64 gap = observed - *vsync_state->trace_last_callback;
                              vsync_state->trace_min_gap = vsync_state->trace_min_gap
-@@ -3529,6 +3604,9 @@ private:
+@@ -3536,6 +3611,9 @@ private:
              m_syncpt_rw = GetInteger(rw->GetSourceAddress());
              m_syncpt_ro = GetInteger(ro->GetSourceAddress());
              m_syncpt_count = max_syncpoints;
@@ -1166,7 +1166,7 @@ index a80387be..8bc11743 100644
              auto& memory = *m_syncpt_memory;
              memory.Write32(m_syncpt_ro + 0x00, 1); // version
              memory.Write32(m_syncpt_ro + 0x04, 0); // base id (guess)
-@@ -3582,6 +3660,7 @@ private:
+@@ -3589,6 +3667,7 @@ private:
      // and rearms if it still has to wait. Acknowledging without a value change costs the client a
      // wakeup per poll, which keeps waits whose syncpoint we never see from hanging.
      void PollSyncpts() {
@@ -1174,7 +1174,7 @@ index a80387be..8bc11743 100644
          if (m_syncpt_memory == nullptr) {
              return;
          }
-@@ -3602,6 +3681,7 @@ private:
+@@ -3609,6 +3688,7 @@ private:
          m_syncpt_memory->Write64(m_syncpt_ro + SyncptRoSummaryOffset,
                                   m_syncpt_memory->Read64(m_syncpt_rw + SyncptRwSummaryOffset));
          if (acked) {
@@ -1343,7 +1343,7 @@ index 491535a6..e2f143ec 100644
  
      // Read meta to determine title ID
 diff --git a/src/core/memory.cpp b/src/core/memory.cpp
-index fd289eb5..497aac71 100644
+index 82fac105..d373a8e7 100644
 --- a/src/core/memory.cpp
 +++ b/src/core/memory.cpp
 @@ -1,3 +1,4 @@
@@ -1608,10 +1608,10 @@ index 7c9a233f..44a1a419 100644
          overflow->SetDefinition(carry_flag);
          overflow->Invalidate();
 diff --git a/src/shader_recompiler/frontend/ampere/lower_to_maxwell.h b/src/shader_recompiler/frontend/ampere/lower_to_maxwell.h
-index f435ccfe..32ebd1ee 100644
+index c49039b9..cb61fcf4 100644
 --- a/src/shader_recompiler/frontend/ampere/lower_to_maxwell.h
 +++ b/src/shader_recompiler/frontend/ampere/lower_to_maxwell.h
-@@ -1778,6 +1778,27 @@ inline LoweredProgram LowerToMaxwellWith(std::span<const Instruction> code, u32
+@@ -1787,6 +1787,27 @@ inline LoweredProgram LowerToMaxwellWith(std::span<const Instruction> code, u32
                  dest % 2 || dest + 2 > limit || a % a_count || a + a_count > limit ||
                  b % b_count || b + b_count > limit || (c != 255 && (c % 2 || c + 2 > limit)))
                  return fail(index, "native half matrix multiply mode");
@@ -1747,7 +1747,7 @@ index 00000000..e9485e27
 +
 +} // namespace Shader::Maxwell
 diff --git a/src/shader_recompiler/frontend/maxwell/translate_program.cpp b/src/shader_recompiler/frontend/maxwell/translate_program.cpp
-index 4abf1d50..33b35d5f 100644
+index 65966124..00f68a93 100644
 --- a/src/shader_recompiler/frontend/maxwell/translate_program.cpp
 +++ b/src/shader_recompiler/frontend/maxwell/translate_program.cpp
 @@ -7,11 +7,17 @@
@@ -1768,7 +1768,7 @@ index 4abf1d50..33b35d5f 100644
  #include "common/settings.h"
  #include "shader_recompiler/exception.h"
  #include "shader_recompiler/frontend/ir/basic_block.h"
-@@ -476,6 +482,49 @@ IR::Program TranslateProgram(ObjectPool<IR::Inst>& inst_pool, ObjectPool<IR::Blo
+@@ -477,6 +483,49 @@ IR::Program TranslateProgram(ObjectPool<IR::Inst>& inst_pool, ObjectPool<IR::Blo
      CollectInterpolationInfo(env, program);
      AddNVNStorageBuffers(program);
      Optimization::LimitSampledTextureArrays(program, normalized_host_info);
@@ -1819,19 +1819,19 @@ index 4abf1d50..33b35d5f 100644
  }
  
 diff --git a/src/tests/CMakeLists.txt b/src/tests/CMakeLists.txt
-index eafb1a54..a705ee5a 100644
+index 195b9b6c..5b8398e9 100644
 --- a/src/tests/CMakeLists.txt
 +++ b/src/tests/CMakeLists.txt
-@@ -100,6 +100,8 @@ add_executable(tests
-     common/event.cpp
+@@ -111,6 +111,8 @@ add_executable(tests
      common/fibers.cpp
+     common/fs_iterate.cpp
      common/game_presets.cpp
 +    common/host_command_completion.cpp
 +    common/host_command_queue.cpp
      common/host_memory.cpp
-     common/page_table.cpp
-     common/param_package.cpp
-@@ -128,7 +130,13 @@ add_executable(tests
+     common/host_memory_failure.cpp
+     common/host_memory_test_access.h
+@@ -143,7 +145,13 @@ add_executable(tests
      video_core/nx2_gpu_mapping.cpp
      video_core/vertex_repack.cpp
      video_core/ampere_lowering.cpp
@@ -3324,7 +3324,7 @@ index 00000000..982fd7f6
 +
 +} // namespace Tegra
 diff --git a/src/video_core/buffer_cache/buffer_cache.h b/src/video_core/buffer_cache/buffer_cache.h
-index a248222d..8fc27513 100644
+index ca414b23..8f8ecde8 100644
 --- a/src/video_core/buffer_cache/buffer_cache.h
 +++ b/src/video_core/buffer_cache/buffer_cache.h
 @@ -9,7 +9,9 @@
@@ -3367,7 +3367,7 @@ index a248222d..8fc27513 100644
      Nx2NoteListHostWrite(device_addr, size);
      // The written range lies within its pages: when they hold no GPU-written data, both lookups
      // below find nothing, so one lookup answers them.
-@@ -558,6 +569,8 @@ std::pair<typename P::Buffer*, u32> BufferCache<P>::ObtainCPUBuffer(
+@@ -560,6 +571,8 @@ std::pair<typename P::Buffer*, u32> BufferCache<P>::ObtainCPUBuffer(
          buffer.MarkUsage(buffer.Offset(device_addr), size);
          break;
      case ObtainBufferOperation::DiscardWrite: {
@@ -3376,7 +3376,7 @@ index a248222d..8fc27513 100644
          ClearDownload(device_addr, size);
          gpu_modified_ranges.Subtract(device_addr, size);
          break;
-@@ -987,6 +1000,8 @@ void BufferCache<P>::CommitAsyncFlushesHigh() {
+@@ -989,6 +1002,8 @@ void BufferCache<P>::CommitAsyncFlushesHigh() {
          download_ranges.Add(orig_device_addr, copy.size);
          buffer.MarkUsage(copy.src_offset, copy.size);
          runtime.CopyBuffer(download_staging.buffer, buffer, copies, false);
@@ -3385,15 +3385,33 @@ index a248222d..8fc27513 100644
          normalized_copies.push_back(second_copy);
      }
      runtime.PostCopyBarrier();
-@@ -1028,6 +1043,7 @@ void BufferCache<P>::PopAsyncBuffers() {
+@@ -1070,6 +1085,7 @@ void BufferCache<P>::PopAsyncBuffers() {
          ranges.ForEachInRange(device_addr, copy.size, [&](DAddr start, DAddr end) {
-             device_memory.WriteBlockUnsafe(start, &read_mapped_memory[start - device_addr],
-                                            end - start);
+             WriteDownloadedMemory(cpu_written, start, &read_mapped_memory[start - device_addr],
+                                   end - start);
 +            ReadbackDependencyDiagnostics::BufferCopyBytes(0, end - start);
              gpu_modified_ranges.Subtract(start, end - start);
          });
      }
-@@ -1805,6 +1821,15 @@ void BufferCache<P>::UpdateIndexBuffer() {
+@@ -1262,7 +1278,16 @@ void BufferCache<P>::BindHostVertexBuffers() {
+             const Binding& binding = VertexBufferSlot(index);
+             Buffer& buffer = slot_buffers[binding.buffer_id];
+             TouchBuffer(buffer, binding.buffer_id);
+-            SynchronizeBuffer(buffer, binding.device_addr, binding.size);
++            // Re-scanning an unchanged vertex range for CPU writes was ~6% of the GPU back thread
++            // in Donkey Kong Bananza (12,000 draws a frame, up to MBs of range each).
++            VertexSyncCache& synced = vertex_sync_cache[index];
++            if (synced.buffer_id != binding.buffer_id || synced.device_addr != binding.device_addr ||
++                synced.size != binding.size ||
++                !memory_tracker.NoCpuMarksSince(synced.sequence, binding.device_addr, binding.size)) {
++                SynchronizeBuffer(buffer, binding.device_addr, binding.size);
++                synced = VertexSyncCache{binding.buffer_id, binding.device_addr, binding.size,
++                                         memory_tracker.CpuMarkSequence()};
++            }
+             if (!flags[Dirty::VertexBuffer0 + index]) {
+                 flush_bindings();
+                 continue;
+@@ -1847,6 +1872,15 @@ void BufferCache<P>::UpdateIndexBuffer() {
      const u32 address_size = static_cast<u32>(gpu_addr_end - gpu_addr_begin);
      const u32 draw_size = (index_buffer_ref.count + index_buffer_ref.first) * u32(index_buffer_ref.FormatSizeInBytes());
      const u32 size = (std::min)(address_size, draw_size);
@@ -3409,7 +3427,7 @@ index a248222d..8fc27513 100644
      if (size == 0 || !device_addr) {
          channel_state->index_buffer = NULL_BINDING;
          return;
-@@ -2000,6 +2025,11 @@ void BufferCache<P>::UpdateComputeTextureBuffers() {
+@@ -2042,6 +2076,11 @@ void BufferCache<P>::UpdateComputeTextureBuffers() {
  
  template <class P>
  void BufferCache<P>::MarkWrittenBuffer(BufferId buffer_id, DAddr device_addr, u32 size, bool needs_sync) {
@@ -3421,7 +3439,7 @@ index a248222d..8fc27513 100644
      if constexpr (!IS_OPENGL) {
          if (needs_sync) {
              Buffer& buffer = slot_buffers[buffer_id];
-@@ -2275,6 +2305,9 @@ BufferId BufferCache<P>::FindBuffer(DAddr device_addr, u32 size, bool sparse_com
+@@ -2317,6 +2356,9 @@ BufferId BufferCache<P>::FindBuffer(DAddr device_addr, u32 size, bool sparse_com
                      usable = false;
                  }
              }
@@ -3431,7 +3449,7 @@ index a248222d..8fc27513 100644
              if (usable) {
                  return buffer_id;
              }
-@@ -2403,6 +2436,15 @@ BufferId BufferCache<P>::CreateBuffer(DAddr device_addr, u32 wanted_size,
+@@ -2445,6 +2487,15 @@ BufferId BufferCache<P>::CreateBuffer(DAddr device_addr, u32 wanted_size,
      wanted_size = static_cast<u32>(device_addr_end - device_addr);
      const OverlapResult overlap = ResolveOverlaps(device_addr, wanted_size);
      const u32 size = static_cast<u32>(overlap.end - overlap.begin);
@@ -3447,7 +3465,7 @@ index a248222d..8fc27513 100644
      const BufferId new_buffer_id =
          slot_buffers.insert(runtime, overlap.begin, size, sparse_compatible);
      auto& new_buffer = slot_buffers[new_buffer_id];
-@@ -2661,6 +2703,7 @@ void BufferCache<P>::DownloadBuffersMemory(std::span<const BufferId> buffer_ids)
+@@ -2703,6 +2754,7 @@ void BufferCache<P>::DownloadBuffersMemory(std::span<const BufferId> buffer_ids)
      struct Download {
          BufferId buffer_id;
          BufferCopy copy;
@@ -3455,7 +3473,7 @@ index a248222d..8fc27513 100644
      };
      std::vector<Download> downloads;
      u64 total_size_bytes = 0;
-@@ -2685,10 +2728,36 @@ void BufferCache<P>::DownloadBuffersMemory(std::span<const BufferId> buffer_ids)
+@@ -2727,10 +2779,36 @@ void BufferCache<P>::DownloadBuffersMemory(std::span<const BufferId> buffer_ids)
      if (total_size_bytes == 0) {
          return;
      }
@@ -3492,26 +3510,27 @@ index a248222d..8fc27513 100644
          buffer.MarkUsage(download.copy.src_offset, download.copy.size);
          runtime.CopyBuffer(download_staging.buffer, buffer, std::span{&download.copy, 1}, true);
      }
-@@ -2696,9 +2765,13 @@ void BufferCache<P>::DownloadBuffersMemory(std::span<const BufferId> buffer_ids)
-     const u8* const mapped_memory = download_staging.mapped_span.data();
+@@ -2739,10 +2817,13 @@ void BufferCache<P>::DownloadBuffersMemory(std::span<const BufferId> buffer_ids)
+     const Common::RangeSet<DAddr> cpu_written = PendingCpuWriteRanges();
      for (const Download& download : downloads) {
          const DAddr device_addr = slot_buffers[download.buffer_id].CpuAddr() + download.copy.src_offset;
--        device_memory.WriteBlockUnsafe(
--            device_addr, mapped_memory + (download.copy.dst_offset - download_staging.offset),
+-        WriteDownloadedMemory(
+-            cpu_written, device_addr,
+-            mapped_memory + (download.copy.dst_offset - download_staging.offset),
 -            download.copy.size);
 +        const auto source = std::span{mapped_memory + (download.copy.dst_offset - download_staging.offset),
 +                                      download.copy.size};
 +        if constexpr (requires { runtime.ValidateMappedReadback(std::span<const u8>{}, std::span<const u8>{}); }) {
 +            if (!download.validation.empty()) runtime.ValidateMappedReadback(download.validation, source);
 +        }
-+        device_memory.WriteBlockUnsafe(device_addr, source.data(), source.size());
++        WriteDownloadedMemory(cpu_written, device_addr, source.data(), source.size());
 +        ReadbackDependencyDiagnostics::BufferCopyBytes(0, download.copy.size);
      }
  }
  
-@@ -2733,8 +2806,28 @@ void BufferCache<P>::DownloadBufferMemory(Buffer& buffer, DAddr device_addr, u64
-         return;
+@@ -2778,8 +2859,28 @@ void BufferCache<P>::DownloadBufferMemory(Buffer& buffer, DAddr device_addr, u64
      }
+     const Common::RangeSet<DAddr> cpu_written = PendingCpuWriteRanges();
  
 +    std::vector<u8> mapped_validation;
 +    if constexpr (requires { runtime.TryMappedReadback(buffer, std::span<const BufferCopy>{}); }) {
@@ -3538,8 +3557,8 @@ index a248222d..8fc27513 100644
 +        if (const auto mapped = buffer.Mapped(); !mapped.empty() && mapped_validation.empty()) {
              runtime.FinishForHostRead();
              for (const BufferCopy& copy : copies) {
-                 device_memory.WriteBlockUnsafe(buffer.CpuAddr() + copy.src_offset,
-@@ -2750,6 +2843,8 @@ void BufferCache<P>::DownloadBufferMemory(Buffer& buffer, DAddr device_addr, u64
+                 WriteDownloadedMemory(cpu_written, buffer.CpuAddr() + copy.src_offset,
+@@ -2795,6 +2896,8 @@ void BufferCache<P>::DownloadBufferMemory(Buffer& buffer, DAddr device_addr, u64
          for (BufferCopy& copy : copies) {
              // Modify copies to have the staging offset in mind
              copy.dst_offset += download_staging.offset;
@@ -3548,7 +3567,7 @@ index a248222d..8fc27513 100644
              buffer.MarkUsage(copy.src_offset, copy.size);
          }
          runtime.CopyBuffer(download_staging.buffer, buffer, copies_span, true);
-@@ -2759,7 +2854,13 @@ void BufferCache<P>::DownloadBufferMemory(Buffer& buffer, DAddr device_addr, u64
+@@ -2804,7 +2907,13 @@ void BufferCache<P>::DownloadBufferMemory(Buffer& buffer, DAddr device_addr, u64
              // Undo the modified offset
              const u64 dst_offset = copy.dst_offset - download_staging.offset;
              const u8* copy_mapped_memory = mapped_memory + dst_offset;
@@ -3557,13 +3576,126 @@ index a248222d..8fc27513 100644
 +                    runtime.ValidateMappedReadback({mapped_validation.data() + dst_offset, copy.size},
 +                                                   {copy_mapped_memory, copy.size});
 +            }
-             device_memory.WriteBlockUnsafe(copy_device_addr, copy_mapped_memory, copy.size);
+             WriteDownloadedMemory(cpu_written, copy_device_addr, copy_mapped_memory, copy.size);
 +            ReadbackDependencyDiagnostics::BufferCopyBytes(0, copy.size);
          }
      } else {
          const std::span<u8> immediate_buffer = ImmediateBuffer(largest_copy);
+diff --git a/src/video_core/buffer_cache/buffer_cache_base.h b/src/video_core/buffer_cache/buffer_cache_base.h
+index d60958cb..33a642a4 100644
+--- a/src/video_core/buffer_cache/buffer_cache_base.h
++++ b/src/video_core/buffer_cache/buffer_cache_base.h
+@@ -655,6 +655,14 @@ private:
+     boost::container::small_vector<BufferCopy, 4> upload_copies;
+ 
+     MemoryTracker memory_tracker;
++    /// What each vertex buffer slot was last synchronized against (BindHostVertexBuffers).
++    struct VertexSyncCache {
++        BufferId buffer_id{};
++        DAddr device_addr{};
++        u32 size{};
++        u64 sequence{};
++    };
++    std::array<VertexSyncCache, NUM_VERTEX_BUFFERS> vertex_sync_cache{};
+     Common::RangeSet<DAddr> uncommitted_gpu_modified_ranges;
+ 
+     /// Whether GPU-written buffer ranges are copied back to guest memory at the next fence;
+diff --git a/src/video_core/buffer_cache/memory_tracker_base.h b/src/video_core/buffer_cache/memory_tracker_base.h
+index 8575aec8..437f6f76 100644
+--- a/src/video_core/buffer_cache/memory_tracker_base.h
++++ b/src/video_core/buffer_cache/memory_tracker_base.h
+@@ -71,7 +71,49 @@ public:
+     }
+ 
+     /// Mark region as CPU modified, notifying the device_tracker about this change
++    /// Sequence number of the latest CPU-modified mark (see NoCpuMarksSince).
++    [[nodiscard]] u64 CpuMarkSequence() const noexcept {
++        return cpu_mark_sequence;
++    }
++
++    /// Whether no page in [addr, addr + size) can have become CPU modified after `since`
++    /// (a CpuMarkSequence value). CPU-modified bits are only set by MarkRegionAsCpuModified
++    /// (recorded per 64 KiB region, hashed: a collision only makes the answer conservative),
++    /// cached-write flushes and new regions (both count as everywhere), so a range synchronized
++    /// at `since` with no later mark in its regions has nothing to upload.
++    [[nodiscard]] bool NoCpuMarksSince(u64 since, VAddr addr, u64 size) const noexcept {
++        if (since < cpu_mark_barrier) {
++            return false;
++        }
++        if (since == cpu_mark_sequence) {
++            return true;
++        }
++        const u64 first = addr >> CPU_MARK_REGION_BITS;
++        const u64 last = (addr + (size ? size - 1 : 0)) >> CPU_MARK_REGION_BITS;
++        if (last - first >= CPU_MARK_MAX_REGIONS) {
++            return false;
++        }
++        for (u64 region = first; region <= last; ++region) {
++            if (cpu_mark_regions[region % CPU_MARK_REGIONS] > since) {
++                return false;
++            }
++        }
++        return true;
++    }
++
+     void MarkRegionAsCpuModified(VAddr dirty_cpu_addr, u64 query_size) {
++        ++cpu_mark_sequence;
++        if (query_size != 0) {
++            const u64 first = dirty_cpu_addr >> CPU_MARK_REGION_BITS;
++            const u64 last = (dirty_cpu_addr + query_size - 1) >> CPU_MARK_REGION_BITS;
++            if (last - first >= CPU_MARK_REGIONS) {
++                cpu_mark_barrier = cpu_mark_sequence;
++            } else {
++                for (u64 region = first; region <= last; ++region) {
++                    cpu_mark_regions[region % CPU_MARK_REGIONS] = cpu_mark_sequence;
++                }
++            }
++        }
+         IteratePages<true>(dirty_cpu_addr, query_size, [](Manager* manager, u64 offset, size_t size) {
+             manager->ChangeRegionState(Type::CPU, true, manager->cpu_addr + offset, size);
+         });
+@@ -124,12 +166,16 @@ public:
+ 
+     /// Flushes cached CPU writes, and notify the device_tracker about the deltas
+     void FlushCachedWrites(VAddr query_cpu_addr, u64 query_size) noexcept {
++        cpu_mark_barrier = ++cpu_mark_sequence;
+         IteratePages<false>(query_cpu_addr, query_size, [](Manager* manager, [[maybe_unused]] u64 offset, [[maybe_unused]] size_t size) {
+             manager->FlushCachedWrites();
+         });
+     }
+ 
+     void FlushCachedWrites() noexcept {
++        if (!cached_pages.empty()) {
++            cpu_mark_barrier = ++cpu_mark_sequence;
++        }
+         for (auto id : cached_pages) {
+             top_tier[id]->FlushCachedWrites();
+         }
+@@ -272,6 +318,8 @@ private:
+     }
+ 
+     void CreateRegion(std::size_t page_index) {
++        // A new region starts CPU modified everywhere.
++        cpu_mark_barrier = ++cpu_mark_sequence;
+         const VAddr base_cpu_addr = page_index << HIGHER_PAGE_BITS;
+         top_tier[page_index] = GetNewManager(base_cpu_addr);
+     }
+@@ -291,6 +339,13 @@ private:
+         return new_manager;
+     }
+ 
++    static constexpr u64 CPU_MARK_REGION_BITS = 16;
++    static constexpr u64 CPU_MARK_REGIONS = 8192;
++    static constexpr u64 CPU_MARK_MAX_REGIONS = 64;
++    std::array<u64, CPU_MARK_REGIONS> cpu_mark_regions{};
++    u64 cpu_mark_sequence = 1;
++    u64 cpu_mark_barrier = 1;
++
+     std::array<Manager*, NUM_HIGH_PAGES> top_tier{};
+     std::deque<std::array<Manager, MANAGER_POOL_SIZE>> manager_pool;
+     std::deque<Manager*> free_managers;
 diff --git a/src/video_core/dma_pusher.cpp b/src/video_core/dma_pusher.cpp
-index 391226c9..dcfc49c7 100644
+index af8fca93..f813e153 100644
 --- a/src/video_core/dma_pusher.cpp
 +++ b/src/video_core/dma_pusher.cpp
 @@ -5,9 +5,11 @@
@@ -3612,7 +3744,7 @@ index 391226c9..dcfc49c7 100644
          // Data word of methods command
          if (dma_state.method_count && dma_state.non_incrementing) {
              auto const& command_header = commands[index]; //must ref (MUltiMethod re)
-@@ -453,6 +474,13 @@ bool DmaPusher::WantsSegment() const {
+@@ -452,6 +473,13 @@ bool DmaPusher::WantsSegment() const {
  }
  
  void DmaPusher::CallMethod(u32 argument) {
@@ -3626,7 +3758,7 @@ index 391226c9..dcfc49c7 100644
      if (g_semaphore_watch != 0) [[unlikely]] {
          WatchArgument(dma_state.method, argument);
      }
-@@ -506,7 +534,9 @@ void DmaPusher::CallMethod(u32 argument) {
+@@ -505,7 +533,9 @@ void DmaPusher::CallMethod(u32 argument) {
              subchannel->method_sink.emplace_back(dma_state.method, argument);
          } else {
              VideoCommon::Nx2Profile::Scope method_scope{VideoCommon::Nx2Profile::Zone::Method};
@@ -3636,7 +3768,7 @@ index 391226c9..dcfc49c7 100644
              subchannel->current_dma_segment = dma_state.dma_get + dma_state.dma_word_offset;
              subchannel->CallMethod(system, dma_state.method, argument, dma_state.is_last_call);
          }
-@@ -514,6 +544,13 @@ void DmaPusher::CallMethod(u32 argument) {
+@@ -513,6 +543,13 @@ void DmaPusher::CallMethod(u32 argument) {
  }
  
  void DmaPusher::CallMultiMethod(const u32* base_start, u32 num_methods) {
@@ -3650,7 +3782,7 @@ index 391226c9..dcfc49c7 100644
      if (g_semaphore_watch != 0) [[unlikely]] {
          for (u32 i = 0; i < num_methods; ++i) {
              WatchArgument(dma_state.method + (dma_state.non_incrementing ? 0 : i), base_start[i]);
-@@ -561,7 +598,9 @@ void DmaPusher::CallMultiMethod(const u32* base_start, u32 num_methods) {
+@@ -560,7 +597,9 @@ void DmaPusher::CallMultiMethod(const u32* base_start, u32 num_methods) {
              return;
          }
          VideoCommon::Nx2Profile::Scope method_scope{VideoCommon::Nx2Profile::Zone::Method};
@@ -3661,7 +3793,7 @@ index 391226c9..dcfc49c7 100644
          subchannel->CallMultiMethod(system, dma_state.method, base_start, num_methods, dma_state.method_count);
      }
 diff --git a/src/video_core/engines/draw_manager.cpp b/src/video_core/engines/draw_manager.cpp
-index bd0b3b2c..193f55d6 100644
+index bd0b3b2c..dc9c5401 100644
 --- a/src/video_core/engines/draw_manager.cpp
 +++ b/src/video_core/engines/draw_manager.cpp
 @@ -12,6 +12,7 @@
@@ -3672,12 +3804,19 @@ index bd0b3b2c..193f55d6 100644
  #include "video_core/render_trace.h"
  
  namespace Tegra::Engines {
-@@ -343,6 +344,9 @@ void Maxwell3D::DrawManager::ProcessDraw(Maxwell3D& maxwell3d, bool draw_indexed
+@@ -343,6 +344,16 @@ void Maxwell3D::DrawManager::ProcessDraw(Maxwell3D& maxwell3d, bool draw_indexed
      LOG_TRACE(HW_GPU, "called, topology={}, count={}", draw_state.topology, draw_indexed ? draw_state.index_buffer.count : draw_state.vertex_buffer.count);
      UpdateTopology(maxwell3d);
      if (maxwell3d.ShouldExecute()) {
 +        if (draw_indexed && maxwell3d.regs.IsShaderConfigEnabled(4)) {
 +            maxwell3d.GetNativeMacroEngine().RecordBananzaTerrainDepthDraw(maxwell3d, instance_count);
++        }
++        // A draw of no vertices or instances writes nothing, but preparing it costs as much as any
++        // other (pipeline, buffers, textures, descriptors): ~3% of Donkey Kong Bananza's draws at
++        // Ingot Isle. Its state stays dirty for the next draw.
++        if (instance_count == 0 ||
++            (draw_indexed ? draw_state.index_buffer.count : draw_state.vertex_buffer.count) == 0) {
++            return;
 +        }
          maxwell3d.rasterizer->Draw(draw_indexed, instance_count);
      } else {
@@ -3716,6 +3855,33 @@ index 996661f8..7638e8b0 100644
  }
  
  } // namespace Tegra::Engines
+diff --git a/src/video_core/engines/maxwell_3d.cpp b/src/video_core/engines/maxwell_3d.cpp
+index 29a9ceab..b6bd307f 100644
+--- a/src/video_core/engines/maxwell_3d.cpp
++++ b/src/video_core/engines/maxwell_3d.cpp
+@@ -30,6 +30,7 @@
+ #include "video_core/query_cache/frame_trace.h"
+ #include "video_core/query_dma.h"
+ #include "video_core/rasterizer_interface.h"
++#include "video_core/texture_barrier_epoch.h"
+ #include "video_core/textures/texture.h"
+ #ifdef ARCHITECTURE_x86_64
+ #include "video_core/macro_turing_jit.h"
+@@ -441,11 +442,14 @@ void Maxwell3D::ProcessMethodCall(u32 method, u32 argument, u32 nonshadow_argume
+         upload_state.ProcessData(argument, is_last_call);
+         return;
+     case MAXWELL3D_REG_INDEX(fragment_barrier):
++        VideoCommon::NoteTextureBarrier();
+         return rasterizer->FragmentBarrier();
+     case MAXWELL3D_REG_INDEX(invalidate_texture_data_cache):
++        VideoCommon::NoteTextureBarrier();
+         rasterizer->InvalidateGPUCache();
+         return rasterizer->WaitForIdle();
+     case MAXWELL3D_REG_INDEX(tiled_cache_barrier):
++        VideoCommon::NoteTextureBarrier();
+         return rasterizer->TiledCacheBarrier();
+     default:
+         draw_manager.ProcessMethodCall(*this, method, argument);
 diff --git a/src/video_core/engines/puller.cpp b/src/video_core/engines/puller.cpp
 index 8fb6a43f..3d9a33d1 100644
 --- a/src/video_core/engines/puller.cpp
@@ -3926,7 +4092,7 @@ index e72284d3..6e7bef24 100644
      impl->ReleaseLargeBuffers();
      return true;
 diff --git a/src/video_core/fence_manager.h b/src/video_core/fence_manager.h
-index ccad4fc8..4d021e49 100644
+index 6bb1c29d..34c7a4b1 100644
 --- a/src/video_core/fence_manager.h
 +++ b/src/video_core/fence_manager.h
 @@ -27,6 +27,7 @@
@@ -3958,7 +4124,7 @@ index ccad4fc8..4d021e49 100644
          query_cache.CommitAsyncFlushes();
          TFence new_fence = CreateFence(!should_flush);
          if constexpr (can_async_check) {
-@@ -334,6 +338,7 @@ private:
+@@ -338,6 +342,7 @@ private:
      struct CacheFlushes {
          bool should_flush;  ///< Downloads to wait for: the fence must reach the host GPU
          u8 committed;       ///< TextureFlushes, BufferFlushes: the caches that committed downloads
@@ -3966,7 +4132,7 @@ index ccad4fc8..4d021e49 100644
      };
  
      /// Commits the texture and buffer caches' downloads for a new fence (the query cache's are
-@@ -347,6 +352,7 @@ private:
+@@ -351,6 +356,7 @@ private:
          {
              std::scoped_lock lock{texture_cache.mutex};
              flushes.should_flush = texture_cache.HasUncommittedFlushes();
@@ -3974,7 +4140,7 @@ index ccad4fc8..4d021e49 100644
              if (texture_cache.HasAsyncFlushWork()) {
                  texture_cache.CommitAsyncFlushes();
                  flushes.committed |= TextureFlushes;
-@@ -357,6 +363,7 @@ private:
+@@ -361,6 +367,7 @@ private:
              if (buffer_cache.HasUncommittedFlushes()) {
                  buffer_cache.CommitAsyncFlushes();
                  flushes.should_flush = true;
@@ -3983,10 +4149,10 @@ index ccad4fc8..4d021e49 100644
              }
          }
 diff --git a/src/video_core/gpu.cpp b/src/video_core/gpu.cpp
-index 2ec20d6d..7f038acd 100644
+index f32fab77..948130bb 100644
 --- a/src/video_core/gpu.cpp
 +++ b/src/video_core/gpu.cpp
-@@ -568,6 +568,10 @@ VideoCore::RasterizerDownloadArea GPU::OnCPURead(PAddr addr, u64 size) {
+@@ -581,6 +581,10 @@ VideoCore::RasterizerDownloadArea GPU::OnCPURead(PAddr addr, u64 size) {
      return impl->OnCPURead(addr, size);
  }
  
@@ -3998,7 +4164,7 @@ index 2ec20d6d..7f038acd 100644
      impl->FlushRegion(addr, size);
  }
 diff --git a/src/video_core/gpu.h b/src/video_core/gpu.h
-index 9084341e..a311297e 100644
+index 55988006..5c2ec52d 100644
 --- a/src/video_core/gpu.h
 +++ b/src/video_core/gpu.h
 @@ -8,6 +8,7 @@
@@ -4009,7 +4175,7 @@ index 9084341e..a311297e 100644
  
  #include "common/bit_field.h"
  #include "common/common_types.h"
-@@ -252,6 +253,7 @@ public:
+@@ -255,6 +256,7 @@ public:
  
      /// Notify rasterizer that any caches of the specified region should be flushed to Switch memory
      [[nodiscard]] VideoCore::RasterizerDownloadArea OnCPURead(DAddr addr, u64 size);
@@ -4018,7 +4184,7 @@ index 9084341e..a311297e 100644
      /// Notify rasterizer that any caches of the specified region should be flushed to Switch memory
      void FlushRegion(DAddr addr, u64 size);
 diff --git a/src/video_core/gpu_split.cpp b/src/video_core/gpu_split.cpp
-index 5adb0712..27beb3c5 100644
+index c1378113..ffe0ffa8 100644
 --- a/src/video_core/gpu_split.cpp
 +++ b/src/video_core/gpu_split.cpp
 @@ -226,6 +226,10 @@ bool GpuSplit::WaitForSync() {
@@ -4063,7 +4229,7 @@ index 2e9250ff..3383a3eb 100644
  private:
      friend struct GpuSplitTestAccess;
 diff --git a/src/video_core/gpu_thread.cpp b/src/video_core/gpu_thread.cpp
-index 7f375695..496df789 100644
+index f2134179..4ed461ad 100644
 --- a/src/video_core/gpu_thread.cpp
 +++ b/src/video_core/gpu_thread.cpp
 @@ -27,15 +27,18 @@ namespace VideoCommon::GPUThread {
@@ -4093,7 +4259,7 @@ index 7f375695..496df789 100644
  }
  
  } // Anonymous namespace
-@@ -119,8 +122,8 @@ void ThreadManager::StartThread(VideoCore::RendererBase& renderer, Core::Fronten
+@@ -122,8 +125,8 @@ void ThreadManager::StartThread(VideoCore::RendererBase& renderer, Core::Fronten
                  } else {
                      ASSERT(false);
                  }
@@ -4104,7 +4270,7 @@ index 7f375695..496df789 100644
                  });
                  split.Publish();
                  continue;
-@@ -143,7 +146,16 @@ void ThreadManager::StartThread(VideoCore::RendererBase& renderer, Core::Fronten
+@@ -146,7 +149,16 @@ void ThreadManager::StartThread(VideoCore::RendererBase& renderer, Core::Fronten
              } else {
                  ASSERT(false);
              }
@@ -4122,7 +4288,7 @@ index 7f375695..496df789 100644
          }
      });
  }
-@@ -191,15 +203,18 @@ u64 ThreadManager::PushCommand(CommandData&& command_data, bool block, bool is_a
+@@ -194,15 +206,18 @@ u64 ThreadManager::PushCommand(CommandData&& command_data, bool block, bool is_a
          block = true;
      }
  
@@ -4202,7 +4368,7 @@ index 927453da..349b720c 100644
  
  /// Class used to manage the GPU thread
 diff --git a/src/video_core/macro.cpp b/src/video_core/macro.cpp
-index b6bca447..bb71ea81 100644
+index c1c29f4e..b5a7ed51 100644
 --- a/src/video_core/macro.cpp
 +++ b/src/video_core/macro.cpp
 @@ -26,6 +26,7 @@
@@ -4312,7 +4478,7 @@ index b6bca447..bb71ea81 100644
          static std::unordered_set<std::uintptr_t> captured_contexts;
          static const bool capture = std::getenv("EDEN_NATIVE_FRAME_CAPTURE") != nullptr;
 diff --git a/src/video_core/macro.h b/src/video_core/macro.h
-index 0d574636..298a6def 100644
+index c116b25a..8bdd523c 100644
 --- a/src/video_core/macro.h
 +++ b/src/video_core/macro.h
 @@ -7,6 +7,8 @@
@@ -4420,7 +4586,7 @@ index 00000000..9dfcd0e8
 +};
 +} // namespace VideoCommon
 diff --git a/src/video_core/memory_manager.cpp b/src/video_core/memory_manager.cpp
-index 2dee3f77..a194f601 100644
+index 3afe49c9..9821d954 100644
 --- a/src/video_core/memory_manager.cpp
 +++ b/src/video_core/memory_manager.cpp
 @@ -1,3 +1,4 @@
@@ -4428,7 +4594,7 @@ index 2dee3f77..a194f601 100644
  // SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
  // SPDX-License-Identifier: GPL-3.0-or-later
  
-@@ -506,17 +507,23 @@ void MemoryManager::ReadWordsUnsafe(GPUVAddr gpu_src_addr, u32* dest, std::size_
+@@ -510,17 +511,23 @@ void MemoryManager::ReadWordsUnsafe(GPUVAddr gpu_src_addr, u32* dest, std::size_
  
  void MemoryManager::WriteBlockImpl(GPUVAddr gpu_dest_addr, const void* src_buffer, std::size_t size, [[maybe_unused]] VideoCommon::CacheType which, bool unsafe) {
      // Give Switch 2 sparse pages the write lands on their memory first (otherwise it is dropped).
@@ -4452,7 +4618,7 @@ index 2dee3f77..a194f601 100644
          }
          // After the copy: the buffer cache may upload the written bytes from guest memory.
          if (!unsafe) {
-@@ -527,12 +534,16 @@ void MemoryManager::WriteBlockImpl(GPUVAddr gpu_dest_addr, const void* src_buffe
+@@ -531,12 +538,16 @@ void MemoryManager::WriteBlockImpl(GPUVAddr gpu_dest_addr, const void* src_buffe
      auto mapped_big = [&](std::size_t page_index, std::size_t offset, std::size_t copy_amount) {
          const DAddr dev_addr_base = (DAddr(big_page_table_dev[page_index]) << cpu_page_bits) + offset;
          if (!unsafe) {
@@ -4469,7 +4635,7 @@ index 2dee3f77..a194f601 100644
          } else {
              memory.WriteBlockUnsafe(dev_addr_base, src_buffer, copy_amount);
          }
-@@ -545,7 +556,9 @@ void MemoryManager::WriteBlockImpl(GPUVAddr gpu_dest_addr, const void* src_buffe
+@@ -549,7 +560,9 @@ void MemoryManager::WriteBlockImpl(GPUVAddr gpu_dest_addr, const void* src_buffe
          GPUVAddr base = (page_index << big_page_bits) + offset;
          MemoryOperation(base, copy_amount, false, mapped_normal, just_advance, just_advance);
      };
@@ -4479,7 +4645,7 @@ index 2dee3f77..a194f601 100644
  }
  
  void MemoryManager::WriteBlock(GPUVAddr gpu_dest_addr, const void* src_buffer, std::size_t size, VideoCommon::CacheType which) {
-@@ -821,17 +834,23 @@ void MemoryManager::InvalidateRegion(GPUVAddr gpu_addr, size_t size,
+@@ -825,17 +838,23 @@ void MemoryManager::InvalidateRegion(GPUVAddr gpu_addr, size_t size,
  
      auto mapped_normal = [&](std::size_t page_index, std::size_t offset, std::size_t copy_amount) {
          const DAddr dev_addr_base = (DAddr(page_table[page_index]) << cpu_page_bits) + offset;
@@ -4504,7 +4670,7 @@ index 2dee3f77..a194f601 100644
  
  void MemoryManager::CopyBlock(GPUVAddr gpu_dest_addr, GPUVAddr gpu_src_addr, std::size_t size,
 diff --git a/src/video_core/nx2.h b/src/video_core/nx2.h
-index fc0cfd04..0868e514 100644
+index 7431fc5e..b591aed7 100644
 --- a/src/video_core/nx2.h
 +++ b/src/video_core/nx2.h
 @@ -7,6 +7,7 @@
@@ -4515,7 +4681,7 @@ index fc0cfd04..0868e514 100644
  #include <map>
  #include <mutex>
  #include <utility>
-@@ -151,7 +152,7 @@ inline void Nx2AddSparseSpan(u64 gpu_address, u64 size) {
+@@ -171,7 +172,7 @@ inline void Nx2AddSparseSpan(u64 gpu_address, u64 size) {
      }
  }
  
@@ -4524,7 +4690,7 @@ index fc0cfd04..0868e514 100644
      if (gpu_address + size <= g_nx2_sparse_low.load(std::memory_order_relaxed) ||
          gpu_address >= g_nx2_sparse_high.load(std::memory_order_relaxed)) [[likely]] {
          return;
-@@ -174,15 +175,19 @@ struct Nx2SparseRegionState {
+@@ -194,15 +195,19 @@ struct Nx2SparseRegionState {
      std::vector<bool> mapped;
  };
  
@@ -4548,7 +4714,7 @@ index fc0cfd04..0868e514 100644
  }
  
  inline void Nx2SparseRegionDestroyed(u64 gpu_address) {
-@@ -198,7 +203,8 @@ inline void Nx2ClearSparseRegions() {
+@@ -218,7 +223,8 @@ inline void Nx2ClearSparseRegions() {
  
  inline void Nx2SparseBlockWritten(u64 region_address, u64 block) {
      std::scoped_lock lk{g_nx2_sparse_state_mutex};
@@ -4558,7 +4724,7 @@ index fc0cfd04..0868e514 100644
          it->second.written[block] = true;
      }
  }
-@@ -213,7 +219,7 @@ inline bool Nx2SparseBlockIsWritten(u64 region_address, u64 block) {
+@@ -233,7 +239,7 @@ inline bool Nx2SparseBlockIsWritten(u64 region_address, u64 block) {
  }
  
  /// The game maps its own memory over [offset, +size) of the region at region_address (mapped), or
@@ -4567,7 +4733,7 @@ index fc0cfd04..0868e514 100644
  inline void Nx2SparseTilesMapped(u64 region_address, u64 offset, u64 size, bool mapped) {
      std::scoped_lock lk{g_nx2_sparse_state_mutex};
      const auto it = g_nx2_sparse_state.find(region_address);
-@@ -221,11 +227,15 @@ inline void Nx2SparseTilesMapped(u64 region_address, u64 offset, u64 size, bool
+@@ -241,11 +247,15 @@ inline void Nx2SparseTilesMapped(u64 region_address, u64 offset, u64 size, bool
          return;
      }
      auto& region = it->second;
@@ -4586,7 +4752,7 @@ index fc0cfd04..0868e514 100644
          region.mapped[tile] = mapped;
      }
  }
-@@ -242,11 +252,12 @@ inline std::vector<std::pair<u64, u64>> Nx2SparseDataRanges(u64 gpu_address, u64
+@@ -262,11 +272,12 @@ inline std::vector<std::pair<u64, u64>> Nx2SparseDataRanges(u64 gpu_address, u64
      }
      --it;
      const auto& [start, region] = *it;
@@ -4601,7 +4767,7 @@ index fc0cfd04..0868e514 100644
      const std::vector<bool>& present = by_tile ? region.mapped : region.written;
      const u64 begin = gpu_address - start;
      const u64 end = begin + size;
-@@ -255,7 +266,7 @@ inline std::vector<std::pair<u64, u64>> Nx2SparseDataRanges(u64 gpu_address, u64
+@@ -275,7 +286,7 @@ inline std::vector<std::pair<u64, u64>> Nx2SparseDataRanges(u64 gpu_address, u64
              continue;
          }
          const u64 run_begin = (std::max)(index * unit, begin) - begin;
@@ -4806,7 +4972,7 @@ index 1cd92dcf..48fd642a 100644
          if (const u64 trace = QueryTrace::Sample(QueryTrace::Event::Write)) {
              const bool wide = True(query_base->flags & QueryFlagBits::HasTimestamp);
 diff --git a/src/video_core/query_cache/query_cache_base.h b/src/video_core/query_cache/query_cache_base.h
-index 5a60e429..3b508fdd 100644
+index d4801cc1..686a0430 100644
 --- a/src/video_core/query_cache/query_cache_base.h
 +++ b/src/video_core/query_cache/query_cache_base.h
 @@ -8,6 +8,7 @@
@@ -4837,7 +5003,7 @@ index 5a60e429..3b508fdd 100644
          IterateCache<true>(addr, size,
                             [this](QueryLocation location) { InvalidateQuery(location); });
      }
-@@ -104,6 +108,15 @@ public:
+@@ -109,6 +113,15 @@ public:
  
      bool AccelerateHostConditionalRendering();
  
@@ -4853,7 +5019,7 @@ index 5a60e429..3b508fdd 100644
      // Async downloads
      void CommitAsyncFlushes();
  
-@@ -123,44 +136,13 @@ public:
+@@ -128,50 +141,13 @@ public:
  protected:
      template <bool remove_from_cache, typename Func>
      void IterateCache(VAddr addr, std::size_t size, Func&& func) {
@@ -4876,10 +5042,12 @@ index 5a60e429..3b508fdd 100644
 -                continue;
 -            }
 -            auto& contents = it->second;
+-            bool matched = false;
 -            for (auto& query : contents) {
 -                if (!in_range(query.first)) {
 -                    continue;
 -                }
+-                matched = true;
 -                if constexpr (RETURNS_BOOL) {
 -                    if (func(query.second)) {
 -                        return;
@@ -4888,7 +5056,11 @@ index 5a60e429..3b508fdd 100644
 -                    func(query.second);
 -                }
 -            }
+-            // Only pages with a query in the range: the scan above already found none elsewhere.
 -            if constexpr (remove_from_cache) {
+-                if (!matched) {
+-                    continue;
+-                }
 -                const auto in_range2 = [&](const std::pair<u32, QueryLocation>& pair) {
 -                    return in_range(pair.first);
 -                };
@@ -4903,7 +5075,7 @@ index 5a60e429..3b508fdd 100644
      }
  
      using ContentCache = ::Common::unordered_map<u64, ::Common::unordered_map<u32, QueryLocation>>;
-@@ -174,6 +156,7 @@ protected:
+@@ -185,6 +161,7 @@ protected:
      ::Common::unordered_map<u64, ::Common::unordered_map<u32, QueryLocation>> cached_queries;
      std::mutex cache_mutex;
  
@@ -4993,10 +5165,10 @@ index 00000000..dd8f6596
 +
 +} // namespace VideoCommon
 diff --git a/src/video_core/rasterizer_interface.h b/src/video_core/rasterizer_interface.h
-index 9cebc4f2..8e4546c6 100644
+index 73222313..2de2f887 100644
 --- a/src/video_core/rasterizer_interface.h
 +++ b/src/video_core/rasterizer_interface.h
-@@ -153,6 +153,13 @@ public:
+@@ -158,6 +158,13 @@ public:
      /// Notify rasterizer that any caches of the specified region are desync with guest
      virtual void OnCacheInvalidation(PAddr addr, u64 size) = 0;
  
@@ -5007,9 +5179,9 @@ index 9cebc4f2..8e4546c6 100644
 +        return std::nullopt;
 +    }
 +
-     virtual bool TryCacheInvalidation(DAddr addr, u64 size) {
-         if (MustFlushRegion(addr, size, VideoCommon::CacheType::BufferCache)) return false;
-         OnCacheInvalidation(addr, size);
+     /// OnCacheInvalidation for each of the CPU writes InvalidateGPUCache collected.
+     virtual void OnCacheInvalidations(std::span<const std::pair<DAddr, u64>> ranges) {
+         for (const auto& [addr, size] : ranges) {
 diff --git a/src/video_core/readback_dependency_diagnostics.h b/src/video_core/readback_dependency_diagnostics.h
 new file mode 100644
 index 00000000..2e485f0c
@@ -5734,7 +5906,7 @@ index 00000000..c62ffe08
 +
 +} // namespace Vulkan::NirHandoff
 diff --git a/src/video_core/renderer_vulkan/vk_buffer_cache.cpp b/src/video_core/renderer_vulkan/vk_buffer_cache.cpp
-index 8cd9bf70..cc363cbf 100644
+index 8e511165..2f0a0513 100644
 --- a/src/video_core/renderer_vulkan/vk_buffer_cache.cpp
 +++ b/src/video_core/renderer_vulkan/vk_buffer_cache.cpp
 @@ -15,6 +15,7 @@
@@ -5825,7 +5997,7 @@ index 8cd9bf70..cc363cbf 100644
  void Buffer::MarkUsage(u64 offset, u64 size) noexcept {
      tracker.Track(offset, size);
      last_usage_tick = scheduler->CurrentTick();
-@@ -373,6 +416,14 @@ BufferCacheRuntime::BufferCacheRuntime(const Device& device_, MemoryAllocator& m
+@@ -382,6 +425,14 @@ BufferCacheRuntime::BufferCacheRuntime(const Device& device_, MemoryAllocator& m
        staging_pool{staging_pool_}, guest_descriptor_queue{guest_descriptor_queue_},
        quad_index_pass(device, scheduler, descriptor_pool, staging_pool,
                        compute_pass_descriptor_queue),
@@ -5840,7 +6012,7 @@ index 8cd9bf70..cc363cbf 100644
        multi_range_buffers(device_) {
      const VkDriverIdKHR driver_id = device.GetDriverID();
      const bool enable_vertex_repack = VertexRepackEnabled();
-@@ -402,6 +453,122 @@ BufferCacheRuntime::BufferCacheRuntime(const Device& device_, MemoryAllocator& m
+@@ -411,6 +462,122 @@ BufferCacheRuntime::BufferCacheRuntime(const Device& device_, MemoryAllocator& m
                                                                       scheduler_, staging_pool_);
  }
  
@@ -5963,15 +6135,15 @@ index 8cd9bf70..cc363cbf 100644
  u32 BufferCacheRuntime::SetVertexRepackLayout(const Tegra::Engines::Maxwell3D::Regs& regs,
                                              bool dynamic_input) {
      const u32 old_mask = vertex_repack_mask;
-@@ -451,6 +618,7 @@ u32 BufferCacheRuntime::GetStorageBufferAlignment() const {
+@@ -464,6 +631,7 @@ u64 BufferCacheRuntime::GetMaxStorageBufferRange() const {
  }
  
  void BufferCacheRuntime::TickFrame(Common::SlotVector<Buffer>& slot_buffers) noexcept {
 +    readback_writers.Prune();
+     multi_range_buffers.TickFrame(scheduler);
      for (auto it = slot_buffers.begin(); it != slot_buffers.end(); it++) {
          if (scheduler.IsFree(it->LastUsageTick())) {
-             it->ResetUsageTracking();
-@@ -458,6 +626,57 @@ void BufferCacheRuntime::TickFrame(Common::SlotVector<Buffer>& slot_buffers) noe
+@@ -472,6 +640,57 @@ void BufferCacheRuntime::TickFrame(Common::SlotVector<Buffer>& slot_buffers) noe
      }
  }
  
@@ -6029,7 +6201,7 @@ index 8cd9bf70..cc363cbf 100644
  u64 BufferCacheRuntime::CurrentTick() {
      return scheduler.CurrentTick();
  }
-@@ -539,6 +758,8 @@ void BufferCacheRuntime::CopyBuffer(VkBuffer dst_buffer, VkBuffer src_buffer,
+@@ -553,6 +772,8 @@ void BufferCacheRuntime::CopyBuffer(VkBuffer dst_buffer, VkBuffer src_buffer,
                                               vk::CommandBuffer, vk::CommandBuffer upload_cmdbuf) {
              upload_cmdbuf.CopyBuffer(src_buffer, dst_buffer, vk_copies);
          });
@@ -6038,7 +6210,7 @@ index 8cd9bf70..cc363cbf 100644
          return;
      }
  
-@@ -554,6 +775,9 @@ void BufferCacheRuntime::CopyBuffer(VkBuffer dst_buffer, VkBuffer src_buffer,
+@@ -568,6 +789,9 @@ void BufferCacheRuntime::CopyBuffer(VkBuffer dst_buffer, VkBuffer src_buffer,
                                     vk::PIPELINE_STAGE_GRAPHICS_COMPUTE, 0, WRITE_BARRIER);
          }
      });
@@ -6048,7 +6220,7 @@ index 8cd9bf70..cc363cbf 100644
  }
  
  void BufferCacheRuntime::PreCopyBarrier() {
-@@ -609,6 +833,8 @@ void BufferCacheRuntime::ClearBuffer(VkBuffer dest_buffer, u32 offset, size_t si
+@@ -623,6 +847,8 @@ void BufferCacheRuntime::ClearBuffer(VkBuffer dest_buffer, u32 offset, size_t si
          cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, vk::PIPELINE_STAGE_GRAPHICS_COMPUTE,
                                 0, WRITE_BARRIER);
      });
@@ -6058,7 +6230,7 @@ index 8cd9bf70..cc363cbf 100644
  
  bool BufferCacheRuntime::BindMultiRangeStorageBuffer(u64 key, bool is_written) {
 diff --git a/src/video_core/renderer_vulkan/vk_buffer_cache.h b/src/video_core/renderer_vulkan/vk_buffer_cache.h
-index f7bc117c..90c3f36c 100644
+index 0a1b8bb4..afe193f6 100644
 --- a/src/video_core/renderer_vulkan/vk_buffer_cache.h
 +++ b/src/video_core/renderer_vulkan/vk_buffer_cache.h
 @@ -19,6 +19,8 @@
@@ -6147,7 +6319,7 @@ index f7bc117c..90c3f36c 100644
  
      bool IsFree(u64 tick);
  
-@@ -252,6 +285,7 @@ public:
+@@ -255,6 +288,7 @@ public:
      }
  
      void OnBufferDeleted(const Buffer& buffer) {
@@ -6155,7 +6327,7 @@ index f7bc117c..90c3f36c 100644
          multi_range_buffers.DropOwner(scheduler, buffer.Handle());
      }
  
-@@ -315,6 +349,9 @@ private:
+@@ -318,6 +352,9 @@ private:
      bool static_vertex_repack{};
      QuadIndexedPass quad_index_pass;
  
@@ -6166,14 +6338,11 @@ index f7bc117c..90c3f36c 100644
      boost::container::small_vector<MultiRangeSource, 16> multi_range_sources;
      VkDeviceSize multi_range_total{};
 diff --git a/src/video_core/renderer_vulkan/vk_compute_pipeline.cpp b/src/video_core/renderer_vulkan/vk_compute_pipeline.cpp
-index fa485038..e34f2fb6 100644
+index 40ffe27a..ffecb8b0 100644
 --- a/src/video_core/renderer_vulkan/vk_compute_pipeline.cpp
 +++ b/src/video_core/renderer_vulkan/vk_compute_pipeline.cpp
-@@ -6,14 +6,18 @@
- 
- #include <algorithm>
- #include <atomic>
-+#include <chrono>
+@@ -10,6 +10,8 @@
+ #include <chrono>
  #include <cstdlib>
  #include <limits>
 +#include <string>
@@ -6181,14 +6350,15 @@ index fa485038..e34f2fb6 100644
  #include <vector>
  
  #include <boost/container/small_vector.hpp>
- #include <fmt/format.h>
+@@ -17,6 +19,7 @@
  
+ #include "video_core/renderer_vulkan/pipeline_build_trace.h"
  #include "video_core/renderer_vulkan/pipeline_helper.h"
 +#include "video_core/renderer_vulkan/nir_handoff.h"
  #include "video_core/renderer_vulkan/pipeline_optimization.h"
  #include "video_core/renderer_vulkan/pipeline_statistics.h"
  #include "video_core/renderer_vulkan/vk_buffer_cache.h"
-@@ -258,7 +262,11 @@ ComputePipeline::ComputePipeline(const Device& device_, Scheduler& scheduler, vk
+@@ -261,7 +264,11 @@ ComputePipeline::ComputePipeline(const Device& device_, Scheduler& scheduler, vk
                                     info.uses_subgroup_shuffles || info.uses_subgroup_mask ||
                                     info.uses_quad_shuffles || info.uses_fswzadd;
          VkPipelineCreateFlags flags{};
@@ -6201,12 +6371,16 @@ index fa485038..e34f2fb6 100644
              flags |= VK_PIPELINE_CREATE_CAPTURE_STATISTICS_BIT_KHR;
          }
          if (uses_descriptor_buffer) {
-@@ -288,7 +296,19 @@ ComputePipeline::ComputePipeline(const Device& device_, Scheduler& scheduler, vk
-             .basePipelineIndex = 0,
-         };
-         try {
-+            const auto create_start = std::chrono::steady_clock::now();
+@@ -295,11 +302,23 @@ ComputePipeline::ComputePipeline(const Device& device_, Scheduler& scheduler, vk
+             const bool unoptimized = (flags & VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT) != 0;
+             const auto trace_begin = std::chrono::steady_clock::now();
+             TracePipelineBuild("BEGIN", "compute", shader_hash, traced, unoptimized);
++            const auto create_start = trace_begin;
              pipeline = device.GetLogical().CreateComputePipeline(compute_ci, *pipeline_cache);
+             TracePipelineBuild("END", "compute", shader_hash, traced, unoptimized,
+                                std::chrono::duration<double, std::milli>(
+                                    std::chrono::steady_clock::now() - trace_begin)
+                                    .count());
 +            // A module that carried NIR (nir_handoff.h): the driver compiled its own copy.
 +            if (const auto detach = NirHandoff::detach.load(std::memory_order_acquire)) {
 +                detach(reinterpret_cast<void*>(*spv_module));
@@ -6221,7 +6395,7 @@ index fa485038..e34f2fb6 100644
          } catch (const vk::Exception& exception) {
              LOG_CRITICAL(Render_Vulkan, "Adreno rejected compute shader {:016X}: {}", shader_hash,
                           exception.what());
-@@ -311,6 +331,25 @@ ComputePipeline::ComputePipeline(const Device& device_, Scheduler& scheduler, vk
+@@ -322,6 +341,25 @@ ComputePipeline::ComputePipeline(const Device& device_, Scheduler& scheduler, vk
          if (pipeline_statistics) {
              pipeline_statistics->Collect(device, *pipeline);
          }
@@ -6248,7 +6422,7 @@ index fa485038..e34f2fb6 100644
          // lives.
          spv_module.reset();
 diff --git a/src/video_core/renderer_vulkan/vk_graphics_pipeline.cpp b/src/video_core/renderer_vulkan/vk_graphics_pipeline.cpp
-index 0cdc7521..9ec75605 100644
+index 4be94a52..0d013b97 100644
 --- a/src/video_core/renderer_vulkan/vk_graphics_pipeline.cpp
 +++ b/src/video_core/renderer_vulkan/vk_graphics_pipeline.cpp
 @@ -1,3 +1,4 @@
@@ -6256,18 +6430,18 @@ index 0cdc7521..9ec75605 100644
  // SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
  // SPDX-License-Identifier: GPL-3.0-or-later
  
-@@ -1250,6 +1251,7 @@ void GraphicsPipeline::MakePipeline(VkRenderPass render_pass) {
+@@ -1265,6 +1266,7 @@ void GraphicsPipeline::MakePipeline(VkRenderPass render_pass) {
          flags |= VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT;
      }
  
 +    VideoCommon::LoadingProbe::driver.Mark("graphics pipeline", IsMeshPipeline());
-     pipeline = device.GetLogical().CreateGraphicsPipeline({
-         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-         .pNext = nullptr,
-@@ -1271,6 +1273,7 @@ void GraphicsPipeline::MakePipeline(VkRenderPass render_pass) {
-         .basePipelineHandle = nullptr,
-         .basePipelineIndex = 0,
-     }, *pipeline_cache);
+     const bool unoptimized = (flags & VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT) != 0;
+     const auto trace_begin = std::chrono::steady_clock::now();
+     TracePipelineBuild("BEGIN", "graphics", key.Hash(), key.unique_hashes, unoptimized);
+@@ -1293,6 +1295,7 @@ void GraphicsPipeline::MakePipeline(VkRenderPass render_pass) {
+                        std::chrono::duration<double, std::milli>(
+                            std::chrono::steady_clock::now() - trace_begin)
+                            .count());
 +    VideoCommon::LoadingProbe::driver.Mark("graphics pipeline done", IsMeshPipeline());
  
      // Log graphics pipeline creation
@@ -6342,7 +6516,7 @@ index ba364d99..1056530a 100644
  
  static constexpr VkPipelineStageFlags wait_stage_mask = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
 diff --git a/src/video_core/renderer_vulkan/vk_pipeline_cache.cpp b/src/video_core/renderer_vulkan/vk_pipeline_cache.cpp
-index 3e1c5954..54742d36 100644
+index a95bb8a4..c92a451b 100644
 --- a/src/video_core/renderer_vulkan/vk_pipeline_cache.cpp
 +++ b/src/video_core/renderer_vulkan/vk_pipeline_cache.cpp
 @@ -1,3 +1,4 @@
@@ -6359,7 +6533,7 @@ index 3e1c5954..54742d36 100644
  #include "video_core/renderer_vulkan/pipeline_shader_emission.h"
  #include "video_core/renderer_vulkan/pipeline_statistics.h"
  #include "video_core/renderer_vulkan/vertex_repack.h"
-@@ -774,12 +777,14 @@ void PipelineCache::SaveUsedPipelines() {
+@@ -777,12 +780,14 @@ void PipelineCache::SaveUsedPipelines() {
  }
  
  GraphicsPipeline* PipelineCache::CurrentGraphicsPipeline() {
@@ -6375,7 +6549,7 @@ index 3e1c5954..54742d36 100644
  
      if (current_pipeline) {
          GraphicsPipeline* const next{current_pipeline->Next(graphics_key)};
-@@ -1259,7 +1264,9 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
+@@ -1293,7 +1298,9 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
          }
  
          const u32 cfg_offset{static_cast<u32>(env.StartAddress() + sizeof(Shader::ProgramHeader))};
@@ -6385,7 +6559,7 @@ index 3e1c5954..54742d36 100644
          if (!uses_vertex_a || index != 1) {
              // Normal path
              programs[index] = TranslateProgram(pools.inst, pools.block, env, cfg, host_info);
-@@ -1339,6 +1346,7 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
+@@ -1373,6 +1380,7 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
          const size_t stage_index{index - 1};
          infos[stage_index] = &program.info;
  
@@ -6393,7 +6567,7 @@ index 3e1c5954..54742d36 100644
          const auto runtime_info{MakeRuntimeInfo(programs, key, program, previous_stage, device)};
          ConvertLegacyToGeneric(program, runtime_info);
          if (emit_pools) {
-@@ -1348,8 +1356,10 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
+@@ -1382,8 +1390,10 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
              }
          } else {
              const auto begin = std::chrono::steady_clock::now();
@@ -6404,7 +6578,7 @@ index 3e1c5954..54742d36 100644
              if (build_in_parallel) {
                  AddRuntimeSpirvTime(0, begin);
              }
-@@ -1577,7 +1587,9 @@ ComputePipelineCacheEntry PipelineCache::CreateComputePipeline(
+@@ -1611,7 +1621,9 @@ ComputePipelineCacheEntry PipelineCache::CreateComputePipeline(
          env.Dump(hash, key.unique_hash);
      }
  
@@ -6414,7 +6588,7 @@ index 3e1c5954..54742d36 100644
      const VkDriverIdKHR driver_id = device.GetDriverID();
      const bool needs_shared_mem_clamp =
          driver_id == VK_DRIVER_ID_QUALCOMM_PROPRIETARY ||
-@@ -1591,7 +1603,47 @@ ComputePipelineCacheEntry PipelineCache::CreateComputePipeline(
+@@ -1625,7 +1637,47 @@ ComputePipelineCacheEntry PipelineCache::CreateComputePipeline(
                      max_shared_memory / 1024);
          program.shared_memory_size = max_shared_memory;
      }
@@ -6463,7 +6637,7 @@ index 3e1c5954..54742d36 100644
      vk::ShaderModule spv_module{BuildShader(device, code)};
  
 diff --git a/src/video_core/renderer_vulkan/vk_rasterizer.cpp b/src/video_core/renderer_vulkan/vk_rasterizer.cpp
-index 3b64b773..85b923b3 100644
+index 8c9df2d7..d19f45b1 100644
 --- a/src/video_core/renderer_vulkan/vk_rasterizer.cpp
 +++ b/src/video_core/renderer_vulkan/vk_rasterizer.cpp
 @@ -1,3 +1,4 @@
@@ -6471,7 +6645,7 @@ index 3b64b773..85b923b3 100644
  // SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
  // SPDX-License-Identifier: GPL-3.0-or-later
  
-@@ -65,6 +66,8 @@
+@@ -67,6 +68,8 @@
  #include "video_core/nx2_debug_control.h"
  #include "video_core/nx2_profile.h"
  
@@ -6480,15 +6654,15 @@ index 3b64b773..85b923b3 100644
  namespace Vulkan {
  
  using Maxwell = Tegra::Engines::Maxwell3D::Regs;
-@@ -281,6 +284,7 @@ RasterizerVulkan::RasterizerVulkan(Core::Frontend::EmuWindow& emu_window_, Tegra
+@@ -283,6 +286,7 @@ RasterizerVulkan::RasterizerVulkan(Core::Frontend::EmuWindow& emu_window_, Tegra
        fence_manager(*this, gpu, texture_cache, buffer_cache, query_cache, device, scheduler),
-       frame_dump(device, memory_allocator, scheduler), wfi_event(device.GetLogical().CreateEvent()) {
+       frame_dump(device, memory_allocator, scheduler) {
      scheduler.SetQueryCache(query_cache);
 +    buffer_cache_runtime.ProbeMappedReadback(descriptor_pool, compute_pass_descriptor_queue);
-     VideoCommon::GpuSplit::Get().SetIdleHook(
-         [](void* argument) { static_cast<Scheduler*>(argument)->FlushDeferred(); },
-         &scheduler);
-@@ -388,6 +392,7 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func, bool is_in
+     buffer_cache.SetPendingCpuWrites(
+         [this](const std::function<void(DAddr, size_t)>& callback) {
+             gpu.ForEachPendingCpuWrite(callback);
+@@ -394,6 +398,7 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func, bool is_in
      SCOPE_EXIT {
          gpu.TickWork();
      };
@@ -6496,7 +6670,7 @@ index 3b64b773..85b923b3 100644
      bool submitted = false;
      SCOPE_EXIT {
          auto& native = maxwell3d->GetNativeMacroEngine();
-@@ -425,6 +430,7 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func, bool is_in
+@@ -431,6 +436,7 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func, bool is_in
      };
      GraphicsPipeline* const pipeline{[&] {
          Profile::Scope scope{Profile::Zone::PipelineLookup};
@@ -6504,7 +6678,7 @@ index 3b64b773..85b923b3 100644
          return pipeline_cache.CurrentGraphicsPipeline();
      }()};
      if (!pipeline) {
-@@ -432,6 +438,7 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func, bool is_in
+@@ -438,6 +444,7 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func, bool is_in
          TraceRenderState(is_indexed, "no-pipeline", nullptr);
          return;
      }
@@ -6512,7 +6686,7 @@ index 3b64b773..85b923b3 100644
      // Task/mesh pipelines: the draw's vertex count is the number of task workgroups.
      mesh_draw = pipeline->IsMeshPipeline();
      // EDEN_NX2_NO_MESH=1: skip task/mesh draws as before they were supported (A/B comparisons).
-@@ -450,6 +457,8 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func, bool is_in
+@@ -456,6 +463,8 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func, bool is_in
          return;
      }
      std::scoped_lock lock{buffer_cache.mutex, texture_cache.mutex};
@@ -6521,15 +6695,15 @@ index 3b64b773..85b923b3 100644
      // update engine as channel may be different.
      pipeline->SetEngine(maxwell3d, gpu_memory);
      const u32 repack_dirty = buffer_cache_runtime.SetVertexRepackLayout(
-@@ -513,6 +522,7 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func, bool is_in
-         UpdateDynamicStates();
+@@ -519,6 +528,7 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func, bool is_in
+         UpdateDynamicStates(pipeline);
      }
  
 +    VideoCommon::LoadingProbe::gpu.Mark("draw submit");
      query_cache.NotifySegment(true);
      HandleTransformFeedback();
      query_cache.CounterEnable(VideoCommon::QueryType::ZPassPixelCount64, maxwell3d->regs.zpass_pixel_count_enable);
-@@ -522,6 +532,7 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func, bool is_in
+@@ -528,6 +538,7 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func, bool is_in
          trace_draw_hashes = {pipeline->ShaderHashes()[1], pipeline->ShaderHashes()[5]};
          draw_func();
      }
@@ -6537,7 +6711,7 @@ index 3b64b773..85b923b3 100644
      submitted = true;
      static u32 native_capture_count{};
      if (maxwell3d->GetNativeMacroEngine().native_turing &&
-@@ -803,8 +814,11 @@ void RasterizerVulkan::Draw(bool is_indexed, u32 instance_count) {
+@@ -809,8 +820,11 @@ void RasterizerVulkan::Draw(bool is_indexed, u32 instance_count) {
                  if (scheduler.GraphicsPipelineMissing()) {
                      return;
                  }
@@ -6549,7 +6723,7 @@ index 3b64b773..85b923b3 100644
              return;
          }
          scheduler.Record([this, draw_params, hashes = trace_draw_hashes](vk::CommandBuffer cmdbuf) {
-@@ -824,6 +838,7 @@ void RasterizerVulkan::Draw(bool is_indexed, u32 instance_count) {
+@@ -830,6 +844,7 @@ void RasterizerVulkan::Draw(bool is_indexed, u32 instance_count) {
                      }
                  });
          });
@@ -6557,7 +6731,7 @@ index 3b64b773..85b923b3 100644
  
          // Log draw call
          if (GPU::Logging::IsActive() &&
-@@ -878,6 +893,7 @@ void RasterizerVulkan::DrawIndirect() {
+@@ -884,6 +899,7 @@ void RasterizerVulkan::DrawIndirect() {
                  cmdbuf.DrawIndirectByteCountEXT(1, 0, buffer_obj, offset, 0,
                                                  static_cast<u32>(stride));
              });
@@ -6565,7 +6739,7 @@ index 3b64b773..85b923b3 100644
              return;
          }
          if (params.include_count) {
-@@ -900,6 +916,7 @@ void RasterizerVulkan::DrawIndirect() {
+@@ -906,6 +922,7 @@ void RasterizerVulkan::DrawIndirect() {
                                               static_cast<u32>(params.stride));
                  }
              });
@@ -6573,7 +6747,7 @@ index 3b64b773..85b923b3 100644
              return;
          }
          scheduler.Record([this, buffer_obj = buffer->Handle(), offset, params,
-@@ -919,6 +936,7 @@ void RasterizerVulkan::DrawIndirect() {
+@@ -925,6 +942,7 @@ void RasterizerVulkan::DrawIndirect() {
                  }
              });
          });
@@ -6581,7 +6755,7 @@ index 3b64b773..85b923b3 100644
  
          // Log indirect draw call
          if (GPU::Logging::IsActive() &&
-@@ -1373,6 +1391,8 @@ void RasterizerVulkan::DispatchCompute() {
+@@ -1379,6 +1397,8 @@ void RasterizerVulkan::DispatchCompute() {
          return;
      }
      std::scoped_lock lock{texture_cache.mutex, buffer_cache.mutex};
@@ -6590,7 +6764,7 @@ index 3b64b773..85b923b3 100644
      std::optional<ByteAddressedShadow> byte_addressed_shadow;
      buffer_cache.Nx2CollectListCopies(true);
      SCOPE_EXIT {
-@@ -1440,6 +1460,7 @@ void RasterizerVulkan::DispatchCompute() {
+@@ -1464,6 +1484,7 @@ void RasterizerVulkan::DispatchCompute() {
                  cmdbuf.DispatchIndirect(indirect_buffer, indirect_offset);
              });
          });
@@ -6598,7 +6772,7 @@ index 3b64b773..85b923b3 100644
          SubmitNx2ListCopies();
          return;
      }
-@@ -1471,6 +1492,7 @@ void RasterizerVulkan::DispatchCompute() {
+@@ -1488,6 +1509,7 @@ void RasterizerVulkan::DispatchCompute() {
              TextureCacheRuntime::CopyByteAddressedShadow(cmdbuf, *byte_addressed_shadow, true);
          }
      });
@@ -6606,7 +6780,7 @@ index 3b64b773..85b923b3 100644
      SubmitNx2ListCopies();
  
      // Log compute dispatch
-@@ -1502,6 +1524,28 @@ void RasterizerVulkan::Query(GPUVAddr gpu_addr, VideoCommon::QueryType type,
+@@ -1519,6 +1541,28 @@ void RasterizerVulkan::Query(GPUVAddr gpu_addr, VideoCommon::QueryType type,
      query_cache.CounterReport(gpu_addr, type, flags, payload, subreport);
  }
  
@@ -6635,7 +6809,7 @@ index 3b64b773..85b923b3 100644
  void RasterizerVulkan::BindGraphicsUniformBuffer(size_t stage, u32 index, GPUVAddr gpu_addr,
                                                   u32 size) {
      buffer_cache.BindGraphicsUniformBuffer(stage, index, gpu_addr, size);
-@@ -1627,18 +1671,28 @@ void RasterizerVulkan::InvalidateRegion(DAddr addr, u64 size, VideoCommon::Cache
+@@ -1648,18 +1692,28 @@ void RasterizerVulkan::InvalidateRegion(DAddr addr, u64 size, VideoCommon::Cache
          return;
      }
      if (True(which & VideoCommon::CacheType::TextureCache)) {
@@ -6664,7 +6838,7 @@ index 3b64b773..85b923b3 100644
      }
  }
  
-@@ -1665,7 +1719,20 @@ void RasterizerVulkan::InnerInvalidation(std::span<const std::pair<DAddr, std::s
+@@ -1686,7 +1740,20 @@ void RasterizerVulkan::InnerInvalidation(std::span<const std::pair<DAddr, std::s
  }
  
  bool RasterizerVulkan::OnCPUWrite(DAddr addr, u64 size) {
@@ -6685,7 +6859,7 @@ index 3b64b773..85b923b3 100644
      {
          std::scoped_lock lock{buffer_cache.mutex};
          if (buffer_cache.OnCPUWrite(addr, size)) {
-@@ -1681,6 +1748,7 @@ bool RasterizerVulkan::OnCPUWrite(DAddr addr, u64 size) {
+@@ -1714,6 +1781,7 @@ void RasterizerVulkan::OnCacheInvalidations(std::span<const std::pair<DAddr, u64
  }
  
  void RasterizerVulkan::OnCacheInvalidation(DAddr addr, u64 size) {
@@ -6693,7 +6867,7 @@ index 3b64b773..85b923b3 100644
      if (addr == 0 || size == 0) {
          return;
      }
-@@ -1697,6 +1765,7 @@ void RasterizerVulkan::OnCacheInvalidation(DAddr addr, u64 size) {
+@@ -1730,6 +1798,7 @@ void RasterizerVulkan::OnCacheInvalidation(DAddr addr, u64 size) {
  }
  
  bool RasterizerVulkan::TryCacheInvalidation(DAddr addr, u64 size) {
@@ -6701,7 +6875,7 @@ index 3b64b773..85b923b3 100644
      if (addr == 0 || size == 0) return true;
      {
          std::scoped_lock lock{buffer_cache.mutex, texture_cache.mutex};
-@@ -1717,6 +1786,7 @@ void RasterizerVulkan::InvalidateGPUCache() {
+@@ -1750,6 +1819,7 @@ void RasterizerVulkan::InvalidateGPUCache() {
  }
  
  void RasterizerVulkan::UnmapMemory(DAddr addr, u64 size) {
@@ -6709,7 +6883,7 @@ index 3b64b773..85b923b3 100644
      {
          std::scoped_lock lock{texture_cache.mutex};
          texture_cache.UnmapMemory(addr, size);
-@@ -1729,6 +1799,7 @@ void RasterizerVulkan::UnmapMemory(DAddr addr, u64 size) {
+@@ -1762,6 +1832,7 @@ void RasterizerVulkan::UnmapMemory(DAddr addr, u64 size) {
  }
  
  void RasterizerVulkan::ModifyGPUMemory(size_t as_id, GPUVAddr addr, u64 size) {
@@ -6717,7 +6891,7 @@ index 3b64b773..85b923b3 100644
      {
          std::scoped_lock lock{texture_cache.mutex};
          texture_cache.UnmapGPUMemory(as_id, addr, size);
-@@ -2070,7 +2141,9 @@ bool RasterizerVulkan::HasDrawTransformFeedback() {
+@@ -2130,7 +2201,9 @@ bool RasterizerVulkan::HasDrawTransformFeedback() {
  bool RasterizerVulkan::AccelerateSurfaceCopy(const Tegra::Engines::Fermi2D::Surface& src,
                                               const Tegra::Engines::Fermi2D::Surface& dst,
                                               const Tegra::Engines::Fermi2D::Config& copy_config) {
@@ -6728,7 +6902,7 @@ index 3b64b773..85b923b3 100644
  }
  
 diff --git a/src/video_core/renderer_vulkan/vk_rasterizer.h b/src/video_core/renderer_vulkan/vk_rasterizer.h
-index dee61c76..4599ece8 100644
+index d5391fa9..edc5b764 100644
 --- a/src/video_core/renderer_vulkan/vk_rasterizer.h
 +++ b/src/video_core/renderer_vulkan/vk_rasterizer.h
 @@ -99,6 +99,7 @@ public:
@@ -6740,7 +6914,7 @@ index dee61c76..4599ece8 100644
      void DisableGraphicsUniformBuffer(size_t stage, u32 index) override;
      void FlushAll() override;
 diff --git a/src/video_core/renderer_vulkan/vk_scheduler.cpp b/src/video_core/renderer_vulkan/vk_scheduler.cpp
-index f65b1b64..8aa33b33 100644
+index 19bbcd96..44c9879c 100644
 --- a/src/video_core/renderer_vulkan/vk_scheduler.cpp
 +++ b/src/video_core/renderer_vulkan/vk_scheduler.cpp
 @@ -1,3 +1,6 @@
@@ -6795,7 +6969,7 @@ index f65b1b64..8aa33b33 100644
              wake = worker_waiting;
          }
          if (wake) {
-@@ -496,6 +513,7 @@ void Scheduler::WorkerThread(std::stop_token stop_token) {
+@@ -509,6 +526,7 @@ void Scheduler::WorkerThread(std::stop_token stop_token) {
          }
  
          work = std::move(work_queue.front());
@@ -6803,7 +6977,7 @@ index f65b1b64..8aa33b33 100644
          work_queue.pop();
          event_cv.notify_all();
          return true;
-@@ -507,6 +525,28 @@ void Scheduler::WorkerThread(std::stop_token stop_token) {
+@@ -520,6 +538,28 @@ void Scheduler::WorkerThread(std::stop_token stop_token) {
          {
              std::unique_lock lk{queue_mutex};
  
@@ -6832,7 +7006,7 @@ index f65b1b64..8aa33b33 100644
              // Wait for work.
              event_cv.wait(lk, stop_token, [&] {
                  worker_waiting = !TryPopQueue(work);
-@@ -771,7 +811,7 @@ u64 Scheduler::SubmitExecution(VkSemaphore signal_semaphore, VkSemaphore wait_se
+@@ -784,7 +824,7 @@ u64 Scheduler::SubmitExecution(VkSemaphore signal_semaphore, VkSemaphore wait_se
  
      const u64 signal_value = master_semaphore->NextTick();
      RecordWithUploadBuffer([signal_semaphore, wait_semaphore, signal_value,
@@ -6841,7 +7015,7 @@ index f65b1b64..8aa33b33 100644
          static constexpr VkMemoryBarrier WRITE_BARRIER{
              .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
              .pNext = nullptr,
-@@ -780,6 +820,16 @@ u64 Scheduler::SubmitExecution(VkSemaphore signal_semaphore, VkSemaphore wait_se
+@@ -793,6 +833,16 @@ u64 Scheduler::SubmitExecution(VkSemaphore signal_semaphore, VkSemaphore wait_se
          };
          upload_cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, WRITE_BARRIER);
          upload_cmdbuf.End();
@@ -6859,7 +7033,7 @@ index f65b1b64..8aa33b33 100644
              cmdbuf.WriteTimestamp(VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, *trace_query_pool,
                                   trace_gpu_count * 2 + 1);
 diff --git a/src/video_core/renderer_vulkan/vk_scheduler.h b/src/video_core/renderer_vulkan/vk_scheduler.h
-index 3184c650..e781aaf4 100644
+index f9770518..6c5ba69d 100644
 --- a/src/video_core/renderer_vulkan/vk_scheduler.h
 +++ b/src/video_core/renderer_vulkan/vk_scheduler.h
 @@ -7,6 +7,7 @@
@@ -6878,7 +7052,7 @@ index 3184c650..e781aaf4 100644
  #include "video_core/renderer_vulkan/fragment_barrier_state.h"
  #include "video_core/renderer_vulkan/vk_master_semaphore.h"
  #include "video_core/vulkan_common/vulkan_wrapper.h"
-@@ -206,6 +208,8 @@ public:
+@@ -211,6 +213,8 @@ public:
          return true;
      }
  
@@ -6887,7 +7061,7 @@ index 3184c650..e781aaf4 100644
      /// Returns the current command buffer tick.
      [[nodiscard]] u64 CurrentTick() const noexcept {
          return master_semaphore->CurrentTick();
-@@ -232,6 +236,7 @@ public:
+@@ -237,6 +241,7 @@ public:
          const auto trace_start = trace ? std::chrono::steady_clock::now()
                                         : std::chrono::steady_clock::time_point{};
          if (tick > 0 && (may_flush || WaitForSubmission(tick))) {
@@ -6895,7 +7069,7 @@ index 3184c650..e781aaf4 100644
              if (tick >= master_semaphore->CurrentTick()) {
                  Flush();
              }
-@@ -493,6 +498,7 @@ private:
+@@ -499,6 +504,7 @@ private:
      DeferredClear deferred_clear;
  
      std::unique_ptr<CommandChunk> chunk;
@@ -6903,7 +7077,7 @@ index 3184c650..e781aaf4 100644
      std::function<void()> on_submit;
  
      State state;
-@@ -509,6 +515,7 @@ private:
+@@ -515,6 +521,7 @@ private:
      std::mutex queue_mutex;
      std::condition_variable_any event_cv;
      bool worker_waiting{}; ///< The worker is waiting for work (guarded by queue_mutex)
@@ -7260,7 +7434,7 @@ index fcd748ce..6fa7a8a6 100644
      bool use_descriptor_buffer{false};
      size_t frame_index{0};
 diff --git a/src/video_core/shader_environment.cpp b/src/video_core/shader_environment.cpp
-index 70ab1136..8c919877 100644
+index 08fad9dd..97adf541 100644
 --- a/src/video_core/shader_environment.cpp
 +++ b/src/video_core/shader_environment.cpp
 @@ -559,10 +559,15 @@ std::shared_ptr<const LoweredNativeCode> GenericEnvironment::LowerNativeCode(u32
@@ -7282,8 +7456,48 @@ index 70ab1136..8c919877 100644
          const auto folder = std::filesystem::path{dump_directory};
          const auto path = folder / fmt::format("{:016x}-{}-{:x}.bin", Shader::Ampere::NativeProgramKey(native),
                                                 source_header_size == 0 ? "cs" : "gfx", program_base);
+diff --git a/src/video_core/texture_barrier_epoch.h b/src/video_core/texture_barrier_epoch.h
+new file mode 100644
+index 00000000..dacd4034
+--- /dev/null
++++ b/src/video_core/texture_barrier_epoch.h
+@@ -0,0 +1,21 @@
++// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
++// SPDX-License-Identifier: GPL-3.0-or-later
++
++#pragma once
++
++#include <atomic>
++
++#include "common/common_types.h"
++
++namespace VideoCommon {
++
++/// Counts the guest's texture barriers (Maxwell3D fragment_barrier, invalidate_texture_data_cache
++/// and tiled_cache_barrier). Texture reads are ordered after earlier colour writes only across
++/// one; TextureCache::SynchronizeAliases uses it to bound feedback copies.
++inline std::atomic<u64> texture_barrier_epoch{};
++
++inline void NoteTextureBarrier() {
++    texture_barrier_epoch.fetch_add(1, std::memory_order_relaxed);
++}
++
++} // namespace VideoCommon
+diff --git a/src/video_core/texture_cache/image_base.cpp b/src/video_core/texture_cache/image_base.cpp
+index 3185dd84..e8c86a3b 100644
+--- a/src/video_core/texture_cache/image_base.cpp
++++ b/src/video_core/texture_cache/image_base.cpp
+@@ -253,6 +253,8 @@ bool AddImageAlias(ImageBase& lhs, ImageBase& rhs, ImageId lhs_id, ImageId rhs_i
+     }
+     lhs.aliased_images.push_back(std::move(lhs_alias));
+     rhs.aliased_images.push_back(std::move(rhs_alias));
++    lhs.alias_maybe_newer = true;
++    rhs.alias_maybe_newer = true;
+     lhs.flags &= ~ImageFlagBits::IsRescalable;
+     rhs.flags &= ~ImageFlagBits::IsRescalable;
+     return true;
 diff --git a/src/video_core/texture_cache/image_base.h b/src/video_core/texture_cache/image_base.h
-index 878c2299..5bc6682e 100644
+index ec6800d3..52713923 100644
 --- a/src/video_core/texture_cache/image_base.h
 +++ b/src/video_core/texture_cache/image_base.h
 @@ -60,6 +60,7 @@ enum class ImageFlagBits : u32 {
@@ -7294,6 +7508,23 @@ index 878c2299..5bc6682e 100644
  };
  DECLARE_ENUM_FLAG_OPERATORS(ImageFlagBits)
  
+@@ -129,6 +130,16 @@ struct ImageBase {
+     VAddr cpu_addr_end = 0;
+ 
+     u64 modification_tick = 0;
++    /// An alias may be newer than this image (TextureCache::SynchronizeAliases walks the aliases
++    /// only then): set when an alias is modified, synchronized or linked, or a copy was deferred.
++    bool alias_maybe_newer = true;
++    /// TextureCache::overlap_epoch when MarkModification last resolved this image's overlaps.
++    u64 overlap_resolved_epoch = 0;
++    /// Feedback copy coalescing (TextureCache::SynchronizeAliases): the bound colour target this
++    /// image was last copied from, and the guest texture barrier count and target set then.
++    ImageId feedback_source{};
++    u64 feedback_barrier_epoch = ~u64{0};
++    u64 feedback_rt_serial = ~u64{0};
+     size_t lru_index = SIZE_MAX;
+ 
+     std::array<u32, MAX_MIP_LEVELS> mip_level_offsets{};
 diff --git a/src/video_core/texture_cache/sparse_image.h b/src/video_core/texture_cache/sparse_image.h
 new file mode 100644
 index 00000000..9e8f8c35
@@ -7329,7 +7560,7 @@ index 00000000..9e8f8c35
 +
 +} // namespace VideoCommon
 diff --git a/src/video_core/texture_cache/texture_cache.h b/src/video_core/texture_cache/texture_cache.h
-index 8ca5df23..ab4aa026 100644
+index 8fa7c114..1878b5fd 100644
 --- a/src/video_core/texture_cache/texture_cache.h
 +++ b/src/video_core/texture_cache/texture_cache.h
 @@ -1,3 +1,4 @@
@@ -7337,7 +7568,23 @@ index 8ca5df23..ab4aa026 100644
  // SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
  // SPDX-License-Identifier: GPL-3.0-or-later
  
-@@ -132,6 +133,9 @@ TextureCache<P>::TextureCache(Runtime& runtime_, Tegra::MaxwellDeviceMemoryManag
+@@ -11,6 +12,7 @@
+ #include <cstdlib>
+ #include <limits>
+ #include <map>
++#include <string_view>
+ #include <vector>
+ #include <optional>
+ #include <bit>
+@@ -36,6 +38,7 @@
+ #include "video_core/nx2.h"
+ #include "video_core/nx2_profile.h"
+ #include "video_core/render_trace.h"
++#include "video_core/texture_barrier_epoch.h"
+ #include "video_core/textures/decoders.h"
+ 
+ namespace VideoCommon {
+@@ -137,6 +140,9 @@ TextureCache<P>::TextureCache(Runtime& runtime_, Tegra::MaxwellDeviceMemoryManag
  
  template <class P>
  void TextureCache<P>::RunGarbageCollector() {
@@ -7347,7 +7594,7 @@ index 8ca5df23..ab4aa026 100644
      bool high_priority_mode = false;
      bool aggressive_mode = false;
      bool evict_old_costly = false;
-@@ -150,18 +154,39 @@ void TextureCache<P>::RunGarbageCollector() {
+@@ -155,18 +161,39 @@ void TextureCache<P>::RunGarbageCollector() {
          num_iterations = aggressive_mode ? 40 : (high_priority_mode ? 20 : 10);
      };
      const auto Cleanup = [this, &num_iterations, &high_priority_mode, &aggressive_mode,
@@ -7388,7 +7635,7 @@ index 8ca5df23..ab4aa026 100644
              return false;
          }
          if (must_download) {
-@@ -177,7 +202,13 @@ void TextureCache<P>::RunGarbageCollector() {
+@@ -182,7 +209,13 @@ void TextureCache<P>::RunGarbageCollector() {
          }
          ++(True(image.flags & ImageFlagBits::CostlyLoad) ? gc_costly_deletes : gc_deletes);
          UnregisterImage(image_id);
@@ -7402,7 +7649,7 @@ index 8ca5df23..ab4aa026 100644
          if (aggressive_mode && total_used_memory < critical_memory) {
              num_iterations >>= 2;
              aggressive_mode = false;
-@@ -253,6 +284,38 @@ void TextureCache<P>::RunGarbageCollector() {
+@@ -258,6 +291,38 @@ void TextureCache<P>::RunGarbageCollector() {
          Configure(true);
          Collect();
      }
@@ -7441,7 +7688,7 @@ index 8ca5df23..ab4aa026 100644
  }
  
  template <class P>
-@@ -496,7 +559,7 @@ typename P::ImageView& TextureCache<P>::GetImageView(u32 index) noexcept {
+@@ -501,12 +566,16 @@ typename P::ImageView& TextureCache<P>::GetImageView(u32 index) noexcept {
  }
  
  template <class P>
@@ -7450,7 +7697,16 @@ index 8ca5df23..ab4aa026 100644
      MarkModification(slot_images[id]);
  }
  
-@@ -919,9 +982,46 @@ FramebufferId TextureCache<P>::GetFramebufferId(const RenderTargets& key) {
+ template <class P>
+ void TextureCache<P>::FillImageViews(std::span<ImageViewInOut> views, bool compute, bool blacklist) {
++    feedback_sampling = !compute;
++    SCOPE_EXIT {
++        feedback_sampling = false;
++    };
+     bool has_blacklisted = false;
+     do {
+         has_deleted_images = false;
+@@ -924,9 +993,46 @@ FramebufferId TextureCache<P>::GetFramebufferId(const RenderTargets& key) {
      return framebuffer_id;
  }
  
@@ -7497,7 +7753,7 @@ index 8ca5df23..ab4aa026 100644
          if (True(image.flags & ImageFlagBits::UnwrittenSparse)) {
              // Written at last: a backed image replaces it where it is used next.
              image.flags |= ImageFlagBits::CpuModified | ImageFlagBits::Remapped;
-@@ -1024,14 +1124,33 @@ std::optional<VideoCore::RasterizerDownloadArea> TextureCache<P>::GetFlushArea(D
+@@ -1029,14 +1135,33 @@ std::optional<VideoCore::RasterizerDownloadArea> TextureCache<P>::GetFlushArea(D
          if (False(image.flags & ImageFlagBits::GpuModified)) {
              return;
          }
@@ -7533,7 +7789,7 @@ index 8ca5df23..ab4aa026 100644
          for (auto image_view_id : image.image_view_ids) {
              auto& image_view = slot_image_views[image_view_id];
              image_view.flags |= ImageViewFlagBits::PreemtiveDownload;
-@@ -1063,6 +1182,8 @@ void TextureCache<P>::UnmapGPUMemory(size_t as_id, GPUVAddr gpu_addr, size_t siz
+@@ -1068,6 +1193,8 @@ void TextureCache<P>::UnmapGPUMemory(size_t as_id, GPUVAddr gpu_addr, size_t siz
                              [&](ImageId id, Image&) { deleted_images.push_back(id); });
      for (const ImageId id : deleted_images) {
          Image& image = slot_images[id];
@@ -7542,15 +7798,15 @@ index 8ca5df23..ab4aa026 100644
          if (False(image.flags & ImageFlagBits::CpuModified)) {
              image.flags |= ImageFlagBits::CpuModified;
              if (True(image.flags & ImageFlagBits::Tracked)) {
-@@ -1081,6 +1202,7 @@ template <class P>
+@@ -1086,6 +1213,7 @@ template <class P>
  bool TextureCache<P>::BlitImage(const Tegra::Engines::Fermi2D::Surface& dst,
                                  const Tegra::Engines::Fermi2D::Surface& src,
                                  const Tegra::Engines::Fermi2D::Config& copy) {
 +    VideoCommon::LoadingProbe::blit.Mark("get blit images");
-     const auto result = GetBlitImages(dst, src, copy);
-     if (!result) {
-         return false;
-@@ -1089,8 +1211,11 @@ bool TextureCache<P>::BlitImage(const Tegra::Engines::Fermi2D::Surface& dst,
+     // A deferred clear parked before this copy has to land before it: realizing it afterwards
+     // starts its clear pass after the copy and wipes what the copy wrote. That is what made
+     // Ocarina of Time draw its terrain layer over the scene (#101): the game clears the
+@@ -1104,8 +1232,11 @@ bool TextureCache<P>::BlitImage(const Tegra::Engines::Fermi2D::Surface& dst,
      const ImageId dst_id = images.dst_id;
      const ImageId src_id = images.src_id;
  
@@ -7562,7 +7818,7 @@ index 8ca5df23..ab4aa026 100644
  
      Image& dst_image = slot_images[dst_id];
      Image& src_image = slot_images[src_id];
-@@ -1177,6 +1302,7 @@ bool TextureCache<P>::BlitImage(const Tegra::Engines::Fermi2D::Surface& dst,
+@@ -1192,6 +1323,7 @@ bool TextureCache<P>::BlitImage(const Tegra::Engines::Fermi2D::Surface& dst,
          // Provide a framebuffer in case it's necessary
          ImageView& dst_view = slot_image_views[dst_view_id];
          ImageView& src_view = slot_image_views[src_view_id];
@@ -7570,7 +7826,7 @@ index 8ca5df23..ab4aa026 100644
          runtime.BlitImage(dst_framebuffer, dst_view, src_view, dst_region, src_region, copy.filter,
                            copy.operation);
      }
-@@ -1797,15 +1923,26 @@ template <class P>
+@@ -1812,15 +1944,26 @@ template <class P>
  bool TextureCache<P>::UploadInChunks(Image& image) {
      // A whole upload of a very large image needs a staging buffer of its full size (rounded up to
      // a power of two: 1 GiB for 600 MiB of data), which can fail when memory is tight.
@@ -7599,7 +7855,7 @@ index 8ca5df23..ab4aa026 100644
      for (u64 offset = 0; offset < image.guest_size_bytes; offset += chunk_size) {
          const std::array range{
              std::pair<u64, u64>{offset, std::min<u64>(offset + chunk_size, image.guest_size_bytes)}};
-@@ -1870,6 +2007,12 @@ void TextureCache<P>::MarkLayersWritten(Image& image, DAddr cpu_addr, size_t siz
+@@ -1885,6 +2028,12 @@ void TextureCache<P>::MarkLayersWritten(Image& image, DAddr cpu_addr, size_t siz
  
  template <class P>
  void TextureCache<P>::MarkRangeWritten(Image& image, DAddr cpu_addr, size_t size) {
@@ -7612,7 +7868,7 @@ index 8ca5df23..ab4aa026 100644
      if (True(image.flags & ImageFlagBits::CpuModified) && image.dirty_ranges.empty()) {
          return; // all of it is dirty already
      }
-@@ -1882,6 +2025,47 @@ void TextureCache<P>::MarkRangeWritten(Image& image, DAddr cpu_addr, size_t size
+@@ -1897,6 +2046,47 @@ void TextureCache<P>::MarkRangeWritten(Image& image, DAddr cpu_addr, size_t size
      image.dirty_ranges.emplace_back(begin - image.cpu_addr, end - begin);
  }
  
@@ -7660,7 +7916,7 @@ index 8ca5df23..ab4aa026 100644
  template <class P>
  void TextureCache<P>::RefreshSparseTiles(Image& image) {
      if constexpr (requires { &Image::BindTiles; }) {
-@@ -1895,18 +2079,20 @@ void TextureCache<P>::RefreshSparseTiles(Image& image) {
+@@ -1910,18 +2100,20 @@ void TextureCache<P>::RefreshSparseTiles(Image& image) {
          const std::vector<LevelRect> rects =
              SparseTileRects(image.info, ranges, image.SparseTileWidth(), image.SparseTileHeight(),
                              image.SparseTailLevel());
@@ -7690,7 +7946,7 @@ index 8ca5df23..ab4aa026 100644
      }
  }
  
-@@ -1925,6 +2111,27 @@ bool TextureCache<P>::BindSparseTiles(Image& image, std::span<const LevelRect> r
+@@ -1940,6 +2132,27 @@ bool TextureCache<P>::BindSparseTiles(Image& image, std::span<const LevelRect> r
      }
  }
  
@@ -7718,7 +7974,7 @@ index 8ca5df23..ab4aa026 100644
  template <class P>
  bool TextureCache<P>::BackSparseTilesWhole(Image& image) {
      if constexpr (requires { &Image::BackTilesWhole; }) {
-@@ -2004,6 +2211,45 @@ std::vector<u32> TextureCache<P>::BindSparseLayers(Image& image, std::span<const
+@@ -2019,6 +2232,45 @@ std::vector<u32> TextureCache<P>::BindSparseLayers(Image& image, std::span<const
      }
  }
  
@@ -7764,7 +8020,7 @@ index 8ca5df23..ab4aa026 100644
  template <class P>
  void TextureCache<P>::UploadLayers(Image& image, std::span<const u32> layers) {
      if constexpr (requires { &Runtime::AccelerateImageUploadLayers; }) {
-@@ -2012,6 +2258,25 @@ void TextureCache<P>::UploadLayers(Image& image, std::span<const u32> layers) {
+@@ -2027,6 +2279,25 @@ void TextureCache<P>::UploadLayers(Image& image, std::span<const u32> layers) {
              ImageInfo layer_info = image.info;
              layer_info.resources.layers = 1;
              const size_t layer_size = CalculateUnswizzledSizeBytes(layer_info);
@@ -7790,7 +8046,7 @@ index 8ca5df23..ab4aa026 100644
              auto staging = runtime.UploadStagingBuffer(layer_size * layers.size());
              std::vector<BufferImageCopy> copies;
              for (size_t i = 0; i < layers.size(); ++i) {
-@@ -2487,6 +2752,9 @@ void TextureCache<P>::TickAsyncUnswizzle() {
+@@ -2502,6 +2773,9 @@ void TextureCache<P>::TickAsyncUnswizzle() {
  
  template <class P>
  bool TextureCache<P>::ScaleUp(Image& image) {
@@ -7800,7 +8056,7 @@ index 8ca5df23..ab4aa026 100644
      const bool has_copy = image.HasScaled();
      const bool rescaled = image.ScaleUp();
      if (!has_copy && image.HasScaled()) {
-@@ -2532,11 +2800,14 @@ ImageId TextureCache<P>::InsertImage(const ImageInfo& info, GPUVAddr gpu_addr,
+@@ -2547,11 +2821,14 @@ ImageId TextureCache<P>::InsertImage(const ImageInfo& info, GPUVAddr gpu_addr,
                                       RelaxedOptions options) {
      std::optional<DAddr> cpu_addr = ImageCpuAddress(gpu_addr, CalculateGuestSizeInBytes(info));
      if (!cpu_addr) {
@@ -7815,7 +8071,7 @@ index 8ca5df23..ab4aa026 100644
      ImageInfo storage_info = info;
      storage_info.native_tiling = gpu_memory->UsesNativeTiling();
      if (storage_info.native_tiling && info.type == ImageType::e3D) {
-@@ -2686,9 +2957,31 @@ ImageId TextureCache<P>::JoinImages(const ImageInfo& info, GPUVAddr gpu_addr, DA
+@@ -2701,9 +2978,31 @@ ImageId TextureCache<P>::JoinImages(const ImageInfo& info, GPUVAddr gpu_addr, DA
          ++images_created;
      }
  
@@ -7848,7 +8104,15 @@ index 8ca5df23..ab4aa026 100644
      }
  
      for (const ImageId overlap_id : join_ignore_textures) {
-@@ -2829,6 +3122,7 @@ ImageId TextureCache<P>::JoinImages(const ImageInfo& info, GPUVAddr gpu_addr, DA
+@@ -2813,6 +3112,7 @@ ImageId TextureCache<P>::JoinImages(const ImageInfo& info, GPUVAddr gpu_addr, DA
+         ImageBase& aliased = slot_images[aliased_id];
+         aliased.overlapping_images.push_back(new_image_id);
+         new_image.overlapping_images.push_back(aliased_id);
++        ++overlap_epoch;
+         if (aliased.info.resources.levels == 1 && aliased.info.block.depth == 0 &&
+             aliased.overlapping_images.size() > 1) {
+             aliased.flags |= ImageFlagBits::BadOverlap;
+@@ -2842,6 +3142,7 @@ ImageId TextureCache<P>::JoinImages(const ImageInfo& info, GPUVAddr gpu_addr, DA
              continue;
          }
          if (True(overlap.flags & ImageFlagBits::GpuModified)) {
@@ -7856,7 +8120,7 @@ index 8ca5df23..ab4aa026 100644
              new_image.flags |= ImageFlagBits::GpuModified;
              const auto& resolution = Settings::values.resolution_info;
              const SubresourceBase base = new_image.TryFindBase(overlap.gpu_addr).value();
-@@ -2872,9 +3166,13 @@ std::optional<typename TextureCache<P>::BlitImages> TextureCache<P>::GetBlitImag
+@@ -2885,9 +3186,13 @@ std::optional<typename TextureCache<P>::BlitImages> TextureCache<P>::GetBlitImag
          try_options |= RelaxedOptions::Format;
      }
      do {
@@ -7870,7 +8134,7 @@ index 8ca5df23..ab4aa026 100644
          if (!copy.must_accelerate) {
              do {
                  if (!src_id && !dst_id) {
-@@ -2907,9 +3205,11 @@ std::optional<typename TextureCache<P>::BlitImages> TextureCache<P>::GetBlitImag
+@@ -2920,9 +3225,11 @@ std::optional<typename TextureCache<P>::BlitImages> TextureCache<P>::GetBlitImag
              }
          }
          if (!src_id) {
@@ -7882,7 +8146,7 @@ index 8ca5df23..ab4aa026 100644
              dst_id = InsertImage(dst_info, dst_addr, RelaxedOptions{});
          }
      } while (has_deleted_images);
-@@ -2924,8 +3224,11 @@ std::optional<typename TextureCache<P>::BlitImages> TextureCache<P>::GetBlitImag
+@@ -2937,8 +3244,11 @@ std::optional<typename TextureCache<P>::BlitImages> TextureCache<P>::GetBlitImag
                                                native_bgr)) {
          // Make sure the images match the expected format.
          do {
@@ -7894,7 +8158,7 @@ index 8ca5df23..ab4aa026 100644
              dst_id = FindOrInsertImage(dst_info, dst_addr, RelaxedOptions{});
          } while (has_deleted_images);
      }
-@@ -3454,6 +3757,7 @@ void TextureCache<P>::UntrackImage(ImageBase& image, ImageId image_id) {
+@@ -3509,6 +3819,7 @@ void TextureCache<P>::UntrackImage(ImageBase& image, ImageId image_id) {
  
  template <class P>
  void TextureCache<P>::DeleteImage(ImageId image_id, bool immediate_delete) {
@@ -7902,7 +8166,7 @@ index 8ca5df23..ab4aa026 100644
      ImageBase& image = slot_images[image_id];
      ++images_deleted;
      // Drop every decode still queued for it, whatever IsDecoding says: an image re-decoded while
-@@ -3610,7 +3914,14 @@ void TextureCache<P>::RemoveFramebuffers(std::span<const ImageViewId> removed_vi
+@@ -3665,27 +3976,91 @@ void TextureCache<P>::RemoveFramebuffers(std::span<const ImageViewId> removed_vi
  }
  
  template <class P>
@@ -7911,14 +8175,102 @@ index 8ca5df23..ab4aa026 100644
 +    // This GPU write creates a newer owner. Complete older partial aliases first, while
 +    // their modification ordering and CPU backing are still unambiguous.
 +    if (!image.aliased_images.empty() || !image.overlapping_images.empty()) {
-+        CompleteAllPartialDownloads();
++        if (!partial_download_images.empty()) {
++            CompleteAllPartialDownloads();
++        }
 +    } else {
 +        CompletePartialDownloads(image.cpu_addr, image.guest_size_bytes, &image);
 +    }
      image.flags |= ImageFlagBits::GpuModified;
      image.modification_tick = ++modification_tick;
++    for (const AliasedImage& alias : image.aliased_images) {
++        // This write is newer than every alias: they copy it when next used.
++        slot_images[alias.id].alias_maybe_newer = true;
++    }
  }
-@@ -3672,7 +3983,8 @@ template <class P>
+ 
+ template <class P>
+ void TextureCache<P>::SynchronizeAliases(ImageId image_id) {
+     boost::container::small_vector<const AliasedImage*, 8> aliased_images;
+     Image& image = slot_images[image_id];
++    // Nothing newer can exist unless an alias was modified, synchronized or linked since the last
++    // walk (Bananza samples a texture with ~590 aliases thousands of times a frame).
++    if (!image.alias_maybe_newer) {
++        return;
++    }
++    image.alias_maybe_newer = false;
++    // A draw that samples an image whose newer alias is one of its own colour targets (a feedback
++    // read: the target's memory viewed at another size or format) copies that target at most once
++    // per guest texture barrier and render-target set. Without a barrier the guest's texture reads
++    // are not ordered after its colour writes, so a copy before every draw gives more than the
++    // hardware does, and it was a full-screen copy for every draw of Donkey Kong Bananza's
++    // G-buffer at Ingot Isle (~1,600 a frame, against ~60 barriers).
++    // EDEN_NX2_FEEDBACK_COPIES=exact restores a copy for every draw.
++    static const bool coalesce_feedback = [] {
++        const char* value = std::getenv("EDEN_NX2_FEEDBACK_COPIES");
++        return value == nullptr || std::string_view{value} != "exact";
++    }();
++    const u64 barrier_epoch = VideoCommon::texture_barrier_epoch.load(std::memory_order_relaxed);
++    // The draw's own colour targets, from its registers (render_targets may still be the last draw's).
++    const auto draw_color_target = [this](ImageId id) {
++        if (!maxwell3d) {
++            return false;
++        }
++        const GPUVAddr address = slot_images[id].gpu_addr;
++        const auto& regs = maxwell3d->regs;
++        for (u32 index = 0; index < regs.rt_control.count; ++index) {
++            if (regs.rt[index].Address() == address) {
++                return true;
++            }
++        }
++        return false;
++    };
++    ImageId feedback_copied{};
++    bool feedback_deferred = false;
+     bool any_rescaled = True(image.flags & ImageFlagBits::Rescaled);
+     bool any_modified = True(image.flags & ImageFlagBits::GpuModified);
+     u64 most_recent_tick = image.modification_tick;
+     for (const AliasedImage& aliased : image.aliased_images) {
+         ImageBase& aliased_image = slot_images[aliased.id];
+         if (image.modification_tick < aliased_image.modification_tick) {
++            if (coalesce_feedback && feedback_sampling && draw_color_target(aliased.id)) {
++                if (image.feedback_source == aliased.id && image.feedback_rt_serial == render_targets_serial &&
++                    image.feedback_barrier_epoch == barrier_epoch) {
++                    feedback_deferred = true;
++                    continue;
++                }
++                feedback_copied = aliased.id;
++            }
+             most_recent_tick = (std::max)(most_recent_tick, aliased_image.modification_tick);
+             aliased_images.push_back(&aliased);
+             any_rescaled |= True(aliased_image.flags & ImageFlagBits::Rescaled);
+             any_modified |= True(aliased_image.flags & ImageFlagBits::GpuModified);
+         }
+     }
++    if (feedback_deferred) {
++        // Still older than the target: copied at the next barrier or render-target change.
++        image.alias_maybe_newer = true;
++    }
++    if (feedback_copied) {
++        image.feedback_source = feedback_copied;
++        image.feedback_barrier_epoch = barrier_epoch;
++        image.feedback_rt_serial = render_targets_serial;
++    }
+     if (aliased_images.empty()) {
+         return;
+     }
+@@ -3698,6 +4073,10 @@ void TextureCache<P>::SynchronizeAliases(ImageId image_id) {
+         }
+     }
+     image.modification_tick = most_recent_tick;
++    // This image now holds newer contents than its older aliases.
++    for (const AliasedImage& aliased : image.aliased_images) {
++        slot_images[aliased.id].alias_maybe_newer = true;
++    }
+     if (any_modified) {
+         image.flags |= ImageFlagBits::GpuModified;
+     }
+@@ -3727,7 +4106,8 @@ template <class P>
  void TextureCache<P>::PrepareImage(ImageId image_id, bool is_modification, bool invalidate) {
      Image& image = slot_images[image_id];
      if (invalidate) {
@@ -7928,7 +8280,7 @@ index 8ca5df23..ab4aa026 100644
          if (False(image.flags & ImageFlagBits::Tracked)) {
              TrackImage(image, image_id);
          }
-@@ -3683,23 +3995,7 @@ void TextureCache<P>::PrepareImage(ImageId image_id, bool is_modification, bool
+@@ -3738,23 +4118,7 @@ void TextureCache<P>::PrepareImage(ImageId image_id, bool is_modification, bool
          }
      }
      if (is_modification) {
@@ -7953,15 +8305,15 @@ index 8ca5df23..ab4aa026 100644
          if constexpr (requires { &Image::BindLayers; }) {
              if (True(image.flags & ImageFlagBits::SparseLayers)) {
                  std::vector<u32> layers(static_cast<size_t>(image.info.resources.layers));
-@@ -3747,6 +4043,7 @@ void TextureCache<P>::CopyImage(ImageId dst_id, ImageId src_id, std::vector<Imag
+@@ -3802,6 +4166,7 @@ void TextureCache<P>::CopyImage(ImageId dst_id, ImageId src_id, std::vector<Imag
          // same guest data, which is uploaded from guest memory instead.
          return;
      }
 +    BackSparseTilesForGpuWrite(dst);
+     // As in BlitImage: land a parked deferred clear before the copy overwrites the image.
+     runtime.FlushDeferredClear();
      const bool is_rescaled = True(src.flags & ImageFlagBits::Rescaled);
-     if (is_rescaled) {
-         ASSERT(True(dst.flags & ImageFlagBits::Rescaled));
-@@ -3839,7 +4136,15 @@ void TextureCache<P>::BindRenderTarget(ImageViewId* old_id, ImageViewId new_id)
+@@ -3896,7 +4261,15 @@ void TextureCache<P>::BindRenderTarget(ImageViewId* old_id, ImageViewId new_id)
      }
      if (new_id) {
          const ImageViewBase& old_view = slot_image_views[new_id];
@@ -7979,7 +8331,7 @@ index 8ca5df23..ab4aa026 100644
              const PendingDownload new_download{true, 0, old_view.image_id};
              uncommitted_downloads.emplace_back(new_download);
 diff --git a/src/video_core/texture_cache/texture_cache_base.h b/src/video_core/texture_cache/texture_cache_base.h
-index 87d0d797..c6beeb3c 100644
+index 87055453..40d86839 100644
 --- a/src/video_core/texture_cache/texture_cache_base.h
 +++ b/src/video_core/texture_cache/texture_cache_base.h
 @@ -187,6 +187,10 @@ class TextureCache : public VideoCommon::ChannelSetupCaches<TextureCacheChannelI
@@ -8017,7 +8369,7 @@ index 87d0d797..c6beeb3c 100644
      std::optional<VideoCore::RasterizerDownloadArea> GetFlushArea(DAddr cpu_addr, u64 size);
  
      /// Remove images in a region
-@@ -469,6 +481,12 @@ private:
+@@ -472,6 +484,12 @@ private:
      /// Stop tracking CPU reads and writes for image
      void UntrackImage(ImageBase& image, ImageId image_id);
  
@@ -8030,7 +8382,7 @@ index 87d0d797..c6beeb3c 100644
      /// Delete image from the cache
      void DeleteImage(ImageId image, bool immediate_delete = false);
  
-@@ -484,8 +502,12 @@ private:
+@@ -487,8 +505,12 @@ private:
      /// Remove framebuffers using the given image views from the cache
      void RemoveFramebuffers(std::span<const ImageViewId> removed_views);
  
@@ -8044,10 +8396,14 @@ index 87d0d797..c6beeb3c 100644
  
      /// Synchronize image aliases, copying data if needed
      void SynchronizeAliases(ImageId image_id);
-@@ -633,6 +655,8 @@ private:
+@@ -639,6 +661,12 @@ private:
      Tegra::Texture::UnswizzleWorker unswizzle_worker;
  
      u64 modification_tick = 0;
++    /// Bumped whenever an overlap link is made (MarkModification's overlap walk).
++    u64 overlap_epoch = 1;
++    /// Graphics texture views are being prepared (feedback copy coalescing).
++    bool feedback_sampling = false;
 +    std::atomic<bool> partial_downloads_seen{false};
 +    std::vector<ImageId> partial_download_images;
      u64 frame_tick = 0;
@@ -8600,7 +8956,7 @@ index 00000000..dfb2e3c2
 +
 +} // namespace Vulkan
 diff --git a/src/video_core/vulkan_common/vulkan_device.cpp b/src/video_core/vulkan_common/vulkan_device.cpp
-index d28dd131..aa871d27 100644
+index 46294256..b5f72ebd 100644
 --- a/src/video_core/vulkan_common/vulkan_device.cpp
 +++ b/src/video_core/vulkan_common/vulkan_device.cpp
 @@ -810,7 +810,13 @@ Device::Device(VkInstance instance_, vk::PhysicalDevice physical_, VkSurfaceKHR
@@ -8618,7 +8974,7 @@ index d28dd131..aa871d27 100644
              .pAllocationCallbacks = nullptr,
              .pDeviceMemoryCallbacks = nullptr,
              .pHeapSizeLimit = heap_size_limit != 0 ? heap_size_limits.data() : nullptr,
-@@ -1584,7 +1590,8 @@ void Device::RemoveUnsuitableExtensions() {
+@@ -1666,7 +1672,8 @@ void Device::RemoveUnsuitableExtensions() {
                                         VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);
  
      // VK_KHR_pipeline_executable_properties
@@ -8629,7 +8985,7 @@ index d28dd131..aa871d27 100644
              features.pipeline_executable_properties.pipelineExecutableInfo;
          RemoveExtensionFeatureIfUnsuitable(extensions.pipeline_executable_properties,
 diff --git a/src/video_core/vulkan_common/vulkan_device.h b/src/video_core/vulkan_common/vulkan_device.h
-index 93a89d12..0332aa9f 100644
+index 58d27f75..049240ac 100644
 --- a/src/video_core/vulkan_common/vulkan_device.h
 +++ b/src/video_core/vulkan_common/vulkan_device.h
 @@ -20,6 +20,7 @@
@@ -8640,7 +8996,7 @@ index 93a89d12..0332aa9f 100644
  #include "video_core/vulkan_common/vulkan_wrapper.h"
  
  VK_DEFINE_HANDLE(VmaAllocator)
-@@ -363,12 +364,8 @@ public:
+@@ -366,12 +367,8 @@ public:
              const char* value = std::getenv("EDEN_NX2_SPARSE_UNBACKED");
              return value == nullptr ? '\0' : value[0];
          }();
@@ -8773,7 +9129,7 @@ index 8b9e72b3..56bd4e92 100644
  #include <memory>
  #include <mutex>
 diff --git a/src/video_core/vulkan_common/vulkan_wrapper.cpp b/src/video_core/vulkan_common/vulkan_wrapper.cpp
-index 49aa08ac..bd944530 100644
+index 7ec4e36e..e585db0d 100644
 --- a/src/video_core/vulkan_common/vulkan_wrapper.cpp
 +++ b/src/video_core/vulkan_common/vulkan_wrapper.cpp
 @@ -18,6 +18,13 @@
@@ -8790,7 +9146,7 @@ index 49aa08ac..bd944530 100644
  namespace {
  
  template <typename Func>
-@@ -521,12 +528,6 @@ void Image::SetObjectNameEXT(const char* name) const {
+@@ -522,12 +529,6 @@ void Image::SetObjectNameEXT(const char* name) const {
      SetObjectName(dld, owner, handle, VK_OBJECT_TYPE_IMAGE, name);
  }
  
@@ -8803,7 +9159,7 @@ index 49aa08ac..bd944530 100644
  Image::MemoryBlock Image::GetMemoryBlock() const noexcept {
      if (allocation == nullptr) {
          return {};
-@@ -540,6 +541,29 @@ Image::MemoryBlock Image::GetMemoryBlock() const noexcept {
+@@ -541,6 +542,29 @@ Image::MemoryBlock Image::GetMemoryBlock() const noexcept {
              info.allocationInfo.size};
  }
  
@@ -8833,7 +9189,7 @@ index 49aa08ac..bd944530 100644
  void Buffer::Flush() const {
      if (!is_coherent) {
          vmaFlushAllocation(allocator, allocation, 0, VK_WHOLE_SIZE);
-@@ -558,6 +582,7 @@ void Buffer::SetObjectNameEXT(const char* name) const {
+@@ -559,6 +583,7 @@ void Buffer::SetObjectNameEXT(const char* name) const {
  
  void Buffer::Release() const noexcept {
      if (handle) {
@@ -8842,10 +9198,10 @@ index 49aa08ac..bd944530 100644
      }
  }
 diff --git a/src/video_core/vulkan_common/vulkan_wrapper.h b/src/video_core/vulkan_common/vulkan_wrapper.h
-index 4df5f5c3..bc57dbc1 100644
+index 382d244c..03fe690b 100644
 --- a/src/video_core/vulkan_common/vulkan_wrapper.h
 +++ b/src/video_core/vulkan_common/vulkan_wrapper.h
-@@ -685,6 +685,7 @@ public:
+@@ -686,6 +686,7 @@ public:
  
  class Image {
  public:
@@ -8853,7 +9209,7 @@ index 4df5f5c3..bc57dbc1 100644
      explicit Image(VkImage handle_, VkImageUsageFlags usage_, VkDevice owner_,
                     VmaAllocator allocator_, VmaAllocation allocation_,
                     const DeviceDispatch& dld_) noexcept
-@@ -780,7 +781,7 @@ public:
+@@ -781,7 +782,7 @@ public:
      Buffer(Buffer&& rhs) noexcept
          : handle{std::exchange(rhs.handle, VkBuffer{})}, owner{rhs.owner}, allocator{rhs.allocator},
            allocation{rhs.allocation}, mapped{rhs.mapped}, location{rhs.location},
@@ -8862,7 +9218,7 @@ index 4df5f5c3..bc57dbc1 100644
  
      Buffer& operator=(Buffer&& rhs) noexcept {
          Release();
-@@ -791,6 +792,7 @@ public:
+@@ -792,6 +793,7 @@ public:
          mapped = rhs.mapped;
          location = rhs.location;
          is_coherent = rhs.is_coherent;
@@ -8870,7 +9226,7 @@ index 4df5f5c3..bc57dbc1 100644
          dld = rhs.dld;
          return *this;
      }
-@@ -831,6 +833,10 @@ public:
+@@ -832,6 +834,10 @@ public:
          return is_coherent;
      }
  
@@ -8881,7 +9237,7 @@ index 4df5f5c3..bc57dbc1 100644
      void Flush() const;
  
      void Invalidate() const;
-@@ -851,6 +857,7 @@ private:
+@@ -852,6 +858,7 @@ private:
      std::span<u8> mapped = {};
      MemoryLocation location{};
      bool is_coherent = false;
