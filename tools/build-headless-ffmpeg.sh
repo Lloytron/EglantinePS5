@@ -62,7 +62,7 @@ bash "$source/configure" --prefix="$prefix" \
     --enable-libdav1d --pkg-config=pkg-config --pkg-config-flags=--static \
     --enable-decoder=h264,vp8,vp9,libdav1d --enable-filter=yadif,scale --enable-pic \
     --enable-pthreads --disable-shared --enable-static
-grep -q 'CONFIG_LIBDAV1D_DECODER 1' config.h || { echo 'FFmpeg configured without libdav1d' >&2; exit 1; }
+grep -qs 'CONFIG_LIBDAV1D_DECODER 1' config_components.h config.h || { echo 'FFmpeg configured without libdav1d' >&2; exit 1; }
 make -j"${EDEN_BUILD_JOBS:-$(nproc)}"
 make install
 # Merge libdav1d into libavcodec, as Lichii's AV1 FFmpeg packages do, so every link of avcodec
