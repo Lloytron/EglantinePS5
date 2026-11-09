@@ -99,6 +99,16 @@ inline void FrameQueued(int swap_interval) noexcept {
         last_interval = swap_interval;
         filled = at = 0;
     }
+    // A title that shows a frame every refresh and comes a little late keeps an honest clock.
+    // Its audio is produced in guest time while the sink paces it in real time, so a stretched
+    // counter makes the guest produce fewer samples than the sink plays: the ring underruns and
+    // the audio clicks, and the picture drifts away from the sound, while the game believes it
+    // is on time. The give is for the two-refresh step, where a few percent decides 30 against
+    // 20; at one refresh the game can drop a step itself and stay in sync.
+    if (swap_interval == 1) {
+        SetRate(kOne);
+        return;
+    }
     if (swap_interval > fast_interval) {
         SetRate(kLowest);
         return;
