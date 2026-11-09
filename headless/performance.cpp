@@ -528,6 +528,8 @@ extern "C" std::int32_t sceKernelDirectMemoryQuery(std::int64_t, int, DirectMemo
 // The largest free block of direct memory is what the next graphics allocation needs. Looked at
 // again every 100 ms; called on the GPU thread by the texture collector (KeepDirtyTextures).
 static std::atomic<unsigned long long> largest_free_block{0};
+// The driver's own buffer bytes (RADV's PS5 winsys counter, renamed by tools/isolate-radv.py).
+extern "C" unsigned long long eden_radv_private_radv_ps5_allocated_bytes __attribute__((weak));
 static void RefreshFreeMemory() {
     static std::atomic<long long> checked_ns{0};
     const long long now = NowNs();
@@ -545,7 +547,7 @@ static void RefreshFreeMemory() {
     graphics_memory_short.store(view.short_memory, std::memory_order_relaxed);
     // The pool, the guest's memory and the heap in stderr.log every 20 s, to see what holds it.
     static std::atomic<long long> summary_ns{0};
-    if (now - summary_ns.load(std::memory_order_relaxed) >= 20'000'000'000) {
+    if (now - summary_ns.load(std::memory_order_relaxed) >= 10'000'000'000) {
         summary_ns.store(now, std::memory_order_relaxed);
         std::size_t guest_span = 0, guest_held = 0;
         ::Common::GuestMemoryUsage(&guest_span, &guest_held);
@@ -554,6 +556,11 @@ static void RefreshFreeMemory() {
                      " (the kernel maps %llu MiB)\n",
                      largest >> 20, int(view.short_memory), guest_held >> 20,
                      kernel_memory ? kernel_memory() >> 20 : 0ULL);
+        std::fprintf(stderr, "EDEN_MEMORY_PARTS t=%lld driver_mib=%llu guest_held_mib=%zu guest_span_mib=%zu\n",
+                     now / 1'000'000'000,
+                     &eden_radv_private_radv_ps5_allocated_bytes != nullptr
+                         ? __atomic_load_n(&eden_radv_private_radv_ps5_allocated_bytes, __ATOMIC_RELAXED) >> 20 : 0ULL,
+                     guest_held >> 20, guest_span >> 20);
         ReportHeap("every 20 s");
         if (const auto pools = guest_pool_report.load(std::memory_order_relaxed)) pools();
     }
